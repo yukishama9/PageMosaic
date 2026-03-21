@@ -1,0 +1,152 @@
+# GitHub Actions — build and publish Electron installers
+# Triggered when a version tag (e.g. v1.0.0) is pushed to the repository.
+#
+# Outputs:
+#   Windows  → WebBuilder-Setup.exe  (Squirrel)
+#   macOS    → WebBuilder.dmg
+#   Linux    → webbuilder_*.deb + *.rpm + *.zip
+#
+# Prerequisites (set in repo Settings → Secrets and variables → Actions):
+#   - No secrets required for basic builds.
+#   - For macOS code signing: APPLE_ID, APPLE_ID_PASSWORD, APPLE_TEAM_ID,
+#     APPLE_CERTIFICATE_BASE64, APPLE_CERTIFICATE_PASSWORD
+
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write   # needed to create GitHub Releases
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Build Windows installer
+  # ---------------------------------------------------------------------------
+  build-windows:
+    name: Windows (.exe)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (Electron Forge make)
+        run: npm run make -- --platform=win32
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: webbuilder-windows
+          path: out/make/**/*
+
+  # ---------------------------------------------------------------------------
+  # Build macOS DMG
+  # ---------------------------------------------------------------------------
+  build-macos:
+    name: macOS (.dmg)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (Electron Forge make)
+        run: npm run make -- --platform=darwin
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: webbuilder-macos
+          path: out/make/**/*
+
+  # ---------------------------------------------------------------------------
+  # Build Linux packages
+  # ---------------------------------------------------------------------------
+  build-linux:
+    name: Linux (.deb / .rpm / .zip)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install system dependencies (for Electron on Linux)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev \
+            librsvg2-dev patchelf rpm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (Electron Forge make)
+        run: npm run make -- --platform=linux
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: webbuilder-linux
+          path: out/make/**/*
+
+  # ---------------------------------------------------------------------------
+  # Create GitHub Release and attach all build artifacts
+  # ---------------------------------------------------------------------------
+  release:
+    name: Publish GitHub Release
+    needs: [build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: webbuilder-windows
+          path: dist/windows
+
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: webbuilder-macos
+          path: dist/macos
+
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: webbuilder-linux
+          path: dist/linux
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # Auto-generate release notes from commits since last tag
+          generate_release_notes: true
+          files: |
+            dist/**/*.exe
+            dist/**/*.dmg
+            dist/**/*.deb
+            dist/**/*.rpm
+            dist/**/*.zip

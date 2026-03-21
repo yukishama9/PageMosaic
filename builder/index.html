@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebBuilder</title>
+
+  <!-- CodeMirror -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/htmlmixed/htmlmixed.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/css/css.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closetag.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/brace-fold.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/xml-fold.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.css">
+
+  <!-- Material Symbols -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
+
+  <!-- App styles -->
+  <link rel="stylesheet" href="css/builder.css">
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+     TOP BAR
+════════════════════════════════════════════════════════════ -->
+<header class="topbar">
+  <div class="topbar-brand">
+    <span class="material-symbols-outlined" style="font-size:16px;color:#6366f1">construction</span>
+    <span class="topbar-title">WebBuilder</span>
+  </div>
+  <div class="topbar-project">
+    <span id="project-name-display" class="topbar-project-name">No project open</span>
+  </div>
+  <div class="topbar-actions">
+    <button class="btn-topbar" onclick="App.saveAll()" id="btn-save-all" title="Save all open editors (Ctrl+Shift+S)">
+      <span class="material-symbols-outlined">save</span>
+      <span>Save All</span>
+    </button>
+    <button class="btn-topbar" onclick="App.reimportFromIndex()" id="btn-reimport" disabled title="Re-import components & shared data from index.html">
+      <span class="material-symbols-outlined">sync</span>
+      <span>Re-import Index</span>
+    </button>
+    <button class="btn-topbar" onclick="App.showExport()" id="btn-export" disabled title="Export project">
+      <span class="material-symbols-outlined">publish</span>
+      <span>Export</span>
+    </button>
+    <button class="btn-topbar" onclick="App.showSettings()" title="Project settings">
+      <span class="material-symbols-outlined">settings</span>
+    </button>
+    <button class="btn-topbar" onclick="App.closeProject()" title="Close project">
+      <span class="material-symbols-outlined">close</span>
+    </button>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════════════════════════
+     MAIN LAYOUT
+════════════════════════════════════════════════════════════ -->
+<div class="app-body">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar">
+
+    <!-- Empty state -->
+    <div id="sidebar-empty" class="sidebar-empty">
+      <span class="material-symbols-outlined" style="font-size:32px;color:#333">folder_open</span>
+      <p>No project open</p>
+      <button class="btn-sm btn-primary" onclick="App.openProject()">Open Project</button>
+      <button class="btn-sm" onclick="App.showNewProject()" style="margin-top:6px">New Project</button>
+      <button class="btn-sm" onclick="App.importProject()" style="margin-top:6px">Import Site</button>
+      <div class="sidebar-ws-mini">
+        <div class="sidebar-ws-row">
+          <span class="material-symbols-outlined" style="font-size:13px;color:#444">folder</span>
+          <span id="sidebar-projects-status" class="sidebar-ws-label">Projects: not set</span>
+          <button class="sidebar-ws-btn" onclick="App.pickProjectsFolder()">Set</button>
+        </div>
+        <div class="sidebar-ws-row">
+          <span class="material-symbols-outlined" style="font-size:13px;color:#444">output</span>
+          <span id="sidebar-releases-status" class="sidebar-ws-label">Releases: not set</span>
+          <button class="sidebar-ws-btn" onclick="App.pickReleasesFolder()">Set</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Project loaded state -->
+    <div id="sidebar-project" class="hidden" style="display:flex;flex-direction:column;height:100%">
+
+      <!-- Section: Pages -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-header" onclick="UI.toggleSection('pages')">
+          <span class="material-symbols-outlined section-icon" id="si-pages">expand_more</span>
+          <span class="section-label">Pages</span>
+          <span class="material-symbols-outlined section-add-btn"
+                onclick="event.stopPropagation();App.importPagesToProject()" title="Import HTML pages from folder">drive_folder_upload</span>
+          <span class="material-symbols-outlined section-add-btn"
+                onclick="event.stopPropagation();App.showNewPage()" title="New blank page">add</span>
+        </div>
+        <div id="section-pages" class="sidebar-section-content"></div>
+      </div>
+
+      <!-- Section: Components -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-header" onclick="UI.toggleSection('components')">
+          <span class="material-symbols-outlined section-icon" id="si-components">expand_more</span>
+          <span class="section-label">Components</span>
+          <span class="material-symbols-outlined section-add-btn"
+                onclick="event.stopPropagation();App.reimportFromIndex()" title="Re-import components & shared data from index.html">refresh</span>
+          <span class="material-symbols-outlined section-add-btn"
+                onclick="event.stopPropagation();App.runAutoDetect()" title="Auto-detect components from pages">auto_fix_high</span>
+          <span class="material-symbols-outlined section-add-btn"
+                onclick="event.stopPropagation();App.showNewComponent()" title="New component">add</span>
+        </div>
+        <div id="section-components" class="sidebar-section-content"></div>
+      </div>
+
+      <!-- Section: Shared Data -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-header" onclick="UI.toggleSection('shared-data')">
+          <span class="material-symbols-outlined section-icon" id="si-shared-data">expand_more</span>
+          <span class="section-label">Shared Data</span>
+          <span class="material-symbols-outlined section-add-btn"
+                onclick="event.stopPropagation();App.showNewSharedData()" title="Add data">add</span>
+        </div>
+        <div id="section-shared-data" class="sidebar-section-content"></div>
+      </div>
+
+      <!-- Section: Languages -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-header" onclick="UI.toggleSection('languages')">
+          <span class="material-symbols-outlined section-icon" id="si-languages">expand_more</span>
+          <span class="section-label">Languages</span>
+          <span class="material-symbols-outlined section-add-btn"
+                onclick="event.stopPropagation();App.showAddLanguage()" title="Add language">add</span>
+        </div>
+        <div id="section-languages" class="sidebar-section-content"></div>
+      </div>
+
+    </div><!-- /sidebar-project -->
+  </aside>
+
+  <!-- ── EDITOR AREA ── -->
+  <main class="editor-area">
+
+    <!-- Tab bar -->
+    <div id="tab-bar" class="tab-bar"></div>
+
+    <!-- ── View: Welcome ── -->
+    <div id="view-welcome" class="view-panel">
+      <div class="welcome-inner">
+
+        <!-- Logo / title -->
+        <div class="welcome-logo">
+          <span class="material-symbols-outlined" style="font-size:40px;color:#6366f1">construction</span>
+          <h1>WebBuilder</h1>
+          <p>Visual HTML site editor with component sync &amp; multi-language support</p>
+        </div>
+
+        <!-- Restore last project (hidden until permission expired) -->
+        <div id="welcome-restore-prompt" class="hidden" style="margin-bottom:16px;padding:10px 14px;background:#1a1a0e;border:1px solid #555520;border-radius:8px;display:flex;align-items:center;gap:10px">
+          <span class="material-symbols-outlined" style="font-size:16px;color:#eab308">lock_open</span>
+          <span style="font-size:12px;color:#ccc;flex:1">Last project needs permission to reopen.</span>
+          <button class="btn-sm btn-primary" onclick="App.restoreLastProject()">Restore</button>
+        </div>
+
+        <!-- Recent projects list -->
+        <div class="welcome-section-title">
+          <span class="material-symbols-outlined" style="font-size:14px;color:#6366f1">history</span>
+          Recent Projects
+        </div>
+        <div id="welcome-recent-projects" class="welcome-recent-list">
+          <p style="font-size:12px;color:#444;text-align:center;padding:12px 0">Loading…</p>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── View: Page Editor ── -->
+    <div id="view-page-editor" class="view-panel hidden">
+      <!-- Toolbar -->
+      <div class="editor-toolbar">
+        <span id="page-editor-filename" class="toolbar-filename"></span>
+        <span id="page-dirty-dot" class="dirty-dot hidden">●</span>
+        <div class="toolbar-spacer"></div>
+        <!-- Code panel toggle -->
+        <button id="btn-toggle-code" class="toolbar-btn" onclick="App.toggleCodePanel()" title="Hide Code">
+          <span class="material-symbols-outlined">code_off</span>
+        </button>
+        <button class="toolbar-btn" onclick="PageEditor.insertComponent()" title="Insert component">
+          <span class="material-symbols-outlined">add_box</span>
+        </button>
+        <button class="toolbar-btn btn-save" onclick="PageEditor.save()" title="Save (Ctrl+S)">
+          <span class="material-symbols-outlined">save</span>
+          <span>Save</span>
+        </button>
+        <!-- Device switcher -->
+        <div class="device-switcher">
+          <button id="device-desktop" class="device-btn active" onclick="App.setDevice('desktop')" title="Desktop">
+            <span class="material-symbols-outlined">computer</span>
+          </button>
+          <button id="device-tablet" class="device-btn" onclick="App.setDevice('tablet')" title="Tablet">
+            <span class="material-symbols-outlined">tablet</span>
+          </button>
+          <button id="device-mobile" class="device-btn" onclick="App.setDevice('mobile')" title="Mobile">
+            <span class="material-symbols-outlined">smartphone</span>
+          </button>
+        </div>
+        <!-- Lang select -->
+        <select id="preview-lang-select" class="toolbar-select" onchange="App.setPreviewLang(this.value)"></select>
+      </div>
+
+      <!-- Split: code + preview -->
+      <div class="editor-split">
+        <!-- Code panel (collapsible) -->
+        <div id="editor-code-panel" class="code-panel">
+          <div class="code-panel-header">
+            <span class="material-symbols-outlined" style="font-size:13px;color:#555">code</span>
+            <span style="font-size:11px;color:#555">HTML Source</span>
+          </div>
+          <div id="page-codemirror-wrap" class="codemirror-wrap"></div>
+        </div>
+
+        <!-- Preview panel -->
+        <div id="editor-preview-panel" class="preview-panel">
+          <div id="preview-outer" class="preview-outer">
+            <iframe id="preview-iframe" class="preview-iframe"></iframe>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── View: Component Editor ── -->
+    <!-- Layout: [left: info panel] | [right: top preview + bottom code] -->
+    <div id="view-component-editor" class="view-panel hidden">
+      <div class="editor-toolbar">
+        <span id="comp-editor-name" class="toolbar-filename"></span>
+        <span id="comp-dirty-dot" class="dirty-dot hidden">●</span>
+        <div class="toolbar-spacer"></div>
+        <button class="toolbar-btn btn-sync" id="btn-sync-comp" onclick="App.syncComponentToPages()" title="Sync this component to all pages that use it">
+          <span class="material-symbols-outlined">sync</span>
+          <span>Sync to Pages</span>
+        </button>
+        <button class="toolbar-btn btn-save" onclick="ComponentEditor.save()">
+          <span class="material-symbols-outlined">save</span>
+          <span>Save</span>
+        </button>
+      </div>
+      <div class="comp-three-panel">
+        <!-- Left: visual fields + shared data info -->
+        <div id="comp-info-panel" class="comp-info-panel">
+          <div id="comp-editor-content" class="comp-editor-inner"></div>
+        </div>
+        <!-- Right: preview (top) + code (bottom) -->
+        <div class="comp-right-panel">
+          <div class="comp-preview-area">
+            <div class="comp-panel-label">
+              <span class="material-symbols-outlined" style="font-size:12px">preview</span>
+              Structure Preview
+            </div>
+            <div class="comp-preview-frame-wrap">
+              <iframe id="comp-preview-iframe" class="preview-iframe"></iframe>
+            </div>
+          </div>
+          <div class="comp-code-area">
+            <div class="comp-panel-label">
+              <span class="material-symbols-outlined" style="font-size:12px">code</span>
+              HTML Source
+              <span style="flex:1"></span>
+              <span id="comp-used-in" class="comp-used-in-inline"></span>
+            </div>
+            <div id="comp-codemirror-wrap" class="comp-codemirror-wrap"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── View: Shared Data Editor ── -->
+    <div id="view-shared-data-editor" class="view-panel hidden">
+      <div class="editor-toolbar">
+        <span id="sd-editor-name" class="toolbar-filename"></span>
+        <div class="toolbar-spacer"></div>
+        <button class="toolbar-btn btn-save" onclick="SharedDataEditor.save()">
+          <span class="material-symbols-outlined">save</span>
+          <span>Save</span>
+        </button>
+      </div>
+      <div class="editor-scroll-area">
+        <div class="editor-content-wrap">
+          <p id="sd-used-in" class="used-in-label"></p>
+          <div id="sd-editor-content"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── View: i18n Editor ── -->
+    <div id="view-i18n-editor" class="view-panel hidden">
+      <div class="editor-toolbar">
+        <span id="i18n-editor-title" class="toolbar-filename"></span>
+        <span id="i18n-missing-count" style="font-size:11px;color:#f97316;margin-left:8px"></span>
+        <div class="toolbar-spacer"></div>
+        <button class="toolbar-btn" onclick="I18nEditor.addKey()">
+          <span class="material-symbols-outlined">add</span>
+          <span>Add Key</span>
+        </button>
+        <button class="toolbar-btn btn-save" onclick="I18nEditor.save()">
+          <span class="material-symbols-outlined">save</span>
+          <span>Save</span>
+        </button>
+      </div>
+      <div class="editor-scroll-area">
+        <div id="i18n-editor-content" class="i18n-content"></div>
+      </div>
+    </div>
+
+  </main>
+</div><!-- /app-body -->
+
+<!-- ═══════════════════════════════════════════════════════════
+     MODALS
+════════════════════════════════════════════════════════════ -->
+
+<!-- Toast -->
+<div id="toast" class="toast toast-info"></div>
+
+<!-- Modal: New Project -->
+<div id="modal-new-project" class="modal-backdrop hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">New Project</span>
+      <button class="modal-close" onclick="UI.closeModal('modal-new-project')">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-field">
+        <label>Project folder name</label>
+        <input id="np-name" type="text" placeholder="my-website" autocomplete="off">
+        <small>Used as the folder name in projects/</small>
+      </div>
+      <div class="form-field">
+        <label>Site title</label>
+        <input id="np-title" type="text" placeholder="My Website">
+      </div>
+      <div class="form-field">
+        <label>Base language</label>
+        <select id="np-lang">
+          <option value="en">English (en)</option>
+          <option value="zh-SC">Chinese Simplified (zh-SC)</option>
+          <option value="zh-TC">Chinese Traditional (zh-TC)</option>
+          <option value="ja">Japanese (ja)</option>
+          <option value="ko">Korean (ko)</option>
+          <option value="fr">French (fr)</option>
+          <option value="de">German (de)</option>
+          <option value="es">Spanish (es)</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="UI.closeModal('modal-new-project')">Cancel</button>
+      <button class="btn-primary" onclick="App.confirmNewProject()">Create Project</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Project Picker -->
+<div id="modal-project-picker" class="modal-backdrop hidden">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <span class="modal-title">Open Project</span>
+      <button class="modal-close" onclick="UI.cancelProjectPicker()">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="modal-body" style="padding:8px 0">
+      <div id="project-picker-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: New Page -->
+<div id="modal-new-page" class="modal-backdrop hidden">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <span class="modal-title">New Page</span>
+      <button class="modal-close" onclick="UI.closeModal('modal-new-page')">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-field">
+        <label>Filename</label>
+        <input id="newpage-name" type="text" placeholder="about.html" autocomplete="off">
+      </div>
+      <div class="form-field">
+        <label>Page title</label>
+        <input id="newpage-title" type="text" placeholder="About Us">
+      </div>
+      <div class="form-field">
+        <label>Template</label>
+        <select id="newpage-tpl">
+          <option value="blank">Blank</option>
+          <option value="with-components">With Components (navbar + footer)</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="UI.closeModal('modal-new-page')">Cancel</button>
+      <button class="btn-primary" onclick="App.confirmNewPage()">Create Page</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: New Component -->
+<div id="modal-new-component" class="modal-backdrop hidden">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <span class="modal-title">New Component</span>
+      <button class="modal-close" onclick="UI.closeModal('modal-new-component')">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-field">
+        <label>Component ID</label>
+        <input id="newcomp-id" type="text" placeholder="my-component" autocomplete="off">
+        <small>Lowercase letters, numbers and hyphens only</small>
+      </div>
+      <div class="form-field">
+        <label>Label</label>
+        <input id="newcomp-label" type="text" placeholder="My Component">
+      </div>
+      <div class="form-field">
+        <label>Template</label>
+        <select id="newcomp-tpl">
+          <option value="blank">Blank</option>
+          <option value="navbar">Navigation Bar</option>
+          <option value="footer">Footer</option>
+          <option value="cookie-banner">Cookie Banner</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="UI.closeModal('modal-new-component')">Cancel</button>
+      <button class="btn-primary" onclick="App.confirmNewComponent()">Create Component</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: New Shared Data -->
+<div id="modal-new-shared-data" class="modal-backdrop hidden">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <span class="modal-title">New Shared Data</span>
+      <button class="modal-close" onclick="UI.closeModal('modal-new-shared-data')">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-field">
+        <label>Data ID</label>
+        <input id="newsd-id" type="text" placeholder="footer-menu" autocomplete="off">
+      </div>
+      <div class="form-field">
+        <label>Label</label>
+        <input id="newsd-label" type="text" placeholder="Footer Menu">
+      </div>
+      <div class="form-field">
+        <label>Type</label>
+        <select id="newsd-type">
+          <option value="menu">Menu / Navigation</option>
+          <option value="icon-links">Social / Icon Links</option>
+          <option value="languages">Language Switcher</option>
+          <option value="custom">Custom</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="UI.closeModal('modal-new-shared-data')">Cancel</button>
+      <button class="btn-primary" onclick="App.confirmNewSharedData()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Add Language -->
+<div id="modal-add-language" class="modal-backdrop hidden">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <span class="modal-title">Add Language</span>
+      <button class="modal-close" onclick="UI.closeModal('modal-add-language')">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-field">
+        <label>Language</label>
+        <select id="addlang-code" onchange="UI.onAddLangChange()">
+          <option value="zh-SC">Chinese Simplified (zh-SC)</option>
+          <option value="zh-TC">Chinese Traditional (zh-TC)</option>
+          <option value="ja">Japanese (ja)</option>
+          <option value="ko">Korean (ko)</option>
+          <option value="fr">French (fr)</option>
+          <option value="de">German (de)</option>
+          <option value="es">Spanish (es)</option>
+          <option value="pt">Portuguese (pt)</option>
+          <option value="ar">Arabic (ar)</option>
+          <option value="ru">Russian (ru)</option>
+          <option value="custom">Custom…</option>
+        </select>
+      </div>
+      <div id="addlang-custom-wrap" class="form-field hidden">
+        <label>Custom language code</label>
+        <input id="addlang-custom-code" type="text" placeholder="e.g. th, vi, id">
+      </div>
+      <div class="form-field">
+        <label>Display name (short)</label>
+        <input id="addlang-display" type="text" placeholder="e.g. 简, EN, 日">
+        <small>Shown in the language switcher</small>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="UI.closeModal('modal-add-language')">Cancel</button>
+      <button class="btn-primary" onclick="App.confirmAddLanguage()">Add Language</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Add i18n Key -->
+<div id="modal-add-i18n-key" class="modal-backdrop hidden">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <span class="modal-title">Add Translation Key</span>
+      <button class="modal-close" onclick="UI.closeModal('modal-add-i18n-key')">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-field">
+        <label>Key (dot notation)</label>
+        <input id="newkey-key" type="text" placeholder="nav.home" autocomplete="off">
+      </div>
+      <div class="form-field">
+        <label>Value (<span id="newkey-lang-label"></span>)</label>
+        <input id="newkey-value" type="text" placeholder="Home">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="UI.closeModal('modal-add-i18n-key')">Cancel</button>
+      <button class="btn-primary" onclick="I18nEditor.confirmAddKey()">Add Key</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Insert Component -->
+<div id="modal-insert-component" class="modal-backdrop hidden">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <span class="modal-title">Insert Component</span>
+      <button class="modal-close" onclick="UI.closeModal('modal-insert-component')">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="modal-body" style="padding:8px 0">
+      <div id="insert-comp-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Export -->
+<div id="modal-export" class="modal-backdrop hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Export Project</span>
+      <button class="modal-close" onclick="UI.closeModal('modal-export')">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-field">
+        <label>Export languages</label>
+        <div id="export-lang-list" style="display:flex;flex-direction:column;gap:6px"></div>
+      </div>
+      <div class="form-field">
+        <label>Output location</label>
+        <code id="export-output-path" style="font-size:12px;color:#6366f1;background:#0d0d18;padding:4px 8px;border-radius:4px;display:inline-block"></code>
+      </div>
+      <div id="export-progress-wrap" class="hidden" style="margin-top:12px">
+        <div class="progress-bar-track">
+          <div id="export-progress-bar" class="progress-bar-fill" style="width:0%"></div>
+        </div>
+        <div id="export-progress-text" style="font-size:11px;color:#666;margin-top:4px"></div>
+      </div>
+      <div id="export-result" class="hidden" style="margin-top:12px">
+        <p id="export-result-text"></p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="UI.closeModal('modal-export')">Close</button>
+      <button id="btn-run-export" class="btn-primary" onclick="App.runExport()">
+        <span class="material-symbols-outlined" style="font-size:15px">publish</span>
+        Export
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Import Confirm — 从 index.html 提取的组件确认 -->
+<div id="modal-import-confirm" class="modal-backdrop hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">
+        <span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;color:#6366f1">auto_fix_high</span>
+        Components Detected from index.html
+      </span>
+      <button class="modal-close" onclick="UI.closeModal('modal-import-confirm')">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:#999;margin-bottom:12px">
+        以下组件已从 <code style="color:#6366f1;background:#0d0d18;padding:1px 5px;border-radius:3px">index.html</code> 中提取。
+        是否将这些组件作为整个项目的模板，<strong style="color:#e0e0e0">同步并覆盖</strong>所有其他页面中的对应区块？
+      </p>
+      <div id="import-confirm-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px"></div>
+      <p style="font-size:11px;color:#555;line-height:1.6">
+        点击「确认同步」后，每个页面中对应的 navbar / footer / cookie-banner 区块将被替换为 index.html 中的版本。
+        页面 <code style="color:#6366f1">&lt;main&gt;</code> 独有内容不受影响。
+      </p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="App.confirmImportComponents(false)">仅提取，不同步</button>
+      <button class="btn-primary" onclick="App.confirmImportComponents(true)">
+        <span class="material-symbols-outlined" style="font-size:15px">sync</span>
+        确认同步至所有页面
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Settings -->
+<div id="modal-settings" class="modal-backdrop hidden">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <span class="modal-title">Project Settings</span>
+      <button class="modal-close" onclick="UI.closeModal('modal-settings')">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-field">
+        <label>Site title</label>
+        <input id="settings-title" type="text">
+      </div>
+      <div class="form-field">
+        <label>Base language</label>
+        <input id="settings-base-lang" type="text" readonly style="opacity:0.5">
+        <small>Base language cannot be changed after creation.</small>
+      </div>
+      <div id="settings-lang-info" class="form-field">
+        <p style="font-size:12px;color:#666"></p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="UI.closeModal('modal-settings')">Cancel</button>
+      <button class="btn-primary" onclick="App.saveSettings()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Scripts -->
+<script src="js/wb-core.js"></script>
+<script src="js/wb-project.js"></script>
+<script src="js/wb-ui.js"></script>
+<script src="js/wb-editors.js"></script>
+<script src="js/wb-preview.js"></script>
+<script src="js/wb-app.js"></script>
+</body>
+</html>
