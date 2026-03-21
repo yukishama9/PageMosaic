@@ -52,6 +52,7 @@ const PageEditor = {
     }
 
     UI.setDirty(`page:${filename}`, false);
+    this._loadMetaPanel(filename);
     setTimeout(() => State.pageCodeMirror.refresh(), 50);
     Preview.renderCurrentPage();
   },
@@ -80,6 +81,48 @@ const PageEditor = {
 
   getCurrentHtml() {
     return State.pageCodeMirror ? State.pageCodeMirror.getValue() : null;
+  },
+
+  // ── Page Metadata panel ───────────────────────────────────────────────────
+  toggleMeta() {
+    const fields = document.getElementById('page-meta-fields');
+    const chevron = document.getElementById('page-meta-chevron');
+    if (!fields) return;
+    const isHidden = fields.classList.toggle('hidden');
+    if (chevron) chevron.style.transform = isHidden ? '' : 'rotate(90deg)';
+  },
+
+  _loadMetaPanel(filename) {
+    const page = (State.pages || []).find(p => p.file === filename);
+    const meta = page?.meta || {};
+    const set = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.value = val || '';
+    };
+    set('meta-title', meta.title);
+    set('meta-desc', meta.description);
+    set('meta-og-title', meta.ogTitle);
+    set('meta-og-desc', meta.ogDescription);
+    set('meta-og-image', meta.ogImage);
+    set('meta-canonical', meta.canonical);
+  },
+
+  onMetaChange() {
+    if (!this._filename) return;
+    const page = (State.pages || []).find(p => p.file === this._filename);
+    if (!page) return;
+    const get = (id) => document.getElementById(id)?.value.trim() || '';
+    page.meta = {
+      title:         get('meta-title'),
+      description:   get('meta-desc'),
+      ogTitle:       get('meta-og-title'),
+      ogDescription: get('meta-og-desc'),
+      ogImage:       get('meta-og-image'),
+      canonical:     get('meta-canonical'),
+    };
+    // Debounced save to project.json
+    clearTimeout(this._metaSaveTimer);
+    this._metaSaveTimer = setTimeout(() => ProjectManager.saveProjectMeta(), 1200);
   },
 
   getCurrentFilename() { return this._filename; },
@@ -619,5 +662,271 @@ const I18nEditor = {
     await ProjectManager.saveI18n(this._lang);
     Utils.showToast(`Saved translations: ${this._lang}`, 'info');
     Preview.renderCurrentPage();
+  },
+};
+
+// ─── Theme Editor ─────────────────────────────────────────────────────────────
+const ThemeEditor = {
+  _tabId: 'theme-editor',
+
+  open() {
+    if (!State.project) { Utils.showToast('Open a project first.', 'error'); return; }
+    UI.addTab(this._tabId, 'Theme', 'palette', () => this._activate());
+  },
+
+  _activate() {
+    UI.showView('theme-editor');
+    this._loadValues();
+    this._populatePageSelect();
+    this._refreshPreview();
+    this._refreshSidebarSwatches();
+  },
+
+  _loadValues() {
+    const theme = State.project?.theme || {};
+    const colors = theme.colors || {};
+    const fonts = theme.fonts || {};
+    const radius = theme.radius || 'sharp';
+
+    const colorKeys = ['primary', 'primaryContainer', 'surface', 'onSurface', 'secondary'];
+    const defaults = {
+      primary: '#e9c176', primaryContainer: '#c5a059',
+      surface: '#131313', onSurface: '#e5e2e1', secondary: '#d5c5a7',
+    };
+    for (const key of colorKeys) {
+      const val = colors[key] || defaults[key];
+      const picker = document.getElementById(`te-color-${key}`);
+      const hex    = document.getElementById(`te-color-${key}-hex`);
+      if (picker) picker.value = val;
+      if (hex)    hex.value    = val.toUpperCase();
+    }
+
+    // Fonts
+    const fontDefaults = { headline: 'Newsreader', body: 'Manrope', label: 'Space Grotesk' };
+    for (const [role, def] of Object.entries(fontDefaults)) {
+      const sel = document.getElementById(`te-font-${role}`);
+      if (sel) sel.value = fonts[role] || def;
+    }
+
+    // Radius
+    document.querySelectorAll('.theme-radius-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.radius === radius);
+    });
+
+    this._updateSwatchBar();
+  },
+
+  _updateSwatchBar() {
+    const colors = this._collectColors();
+    const map = {
+      'te-swatch-surface':           colors.surface,
+      'te-swatch-primary':           colors.primary,
+      'te-swatch-primary-container': colors.primaryContainer,
+      'te-swatch-secondary':         colors.secondary,
+      'te-swatch-on-surface':        colors.onSurface,
+    };
+    for (const [id, color] of Object.entries(map)) {
+      const el = document.getElementById(id);
+      if (el) el.style.background = color;
+    }
+  },
+
+  _collectColors() {
+    const keys = ['primary', 'primaryContainer', 'surface', 'onSurface', 'secondary'];
+    const obj = {};
+    for (const k of keys) {
+      const picker = document.getElementById(`te-color-${k}`);
+      obj[k] = picker?.value || '#888888';
+    }
+    return obj;
+  },
+
+  _collectFonts() {
+    return {
+      headline: document.getElementById('te-font-headline')?.value || 'Newsreader',
+      body:     document.getElementById('te-font-body')?.value     || 'Manrope',
+      label:    document.getElementById('te-font-label')?.value    || 'Space Grotesk',
+    };
+  },
+
+  _collectRadius() {
+    const active = document.querySelector('.theme-radius-btn.active');
+    return active?.dataset.radius || 'sharp';
+  },
+
+  onColorChange() {
+    // Sync hex inputs from color pickers
+    const keys = ['primary', 'primaryContainer', 'surface', 'onSurface', 'secondary'];
+    for (const k of keys) {
+      const picker = document.getElementById(`te-color-${k}`);
+      const hex    = document.getElementById(`te-color-${k}-hex`);
+      if (picker && hex && document.activeElement !== hex) {
+        hex.value = picker.value.toUpperCase();
+      }
+    }
+    this._updateSwatchBar();
+    this._refreshPreview();
+  },
+
+  onHexInput(key) {
+    const hex    = document.getElementById(`te-color-${key}-hex`);
+    const picker = document.getElementById(`te-color-${key}`);
+    if (!hex || !picker) return;
+    const val = hex.value.trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+      picker.value = val;
+      this._updateSwatchBar();
+      this._refreshPreview();
+    }
+  },
+
+  onRadiusSelect(radius) {
+    document.querySelectorAll('.theme-radius-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.radius === radius);
+    });
+    this._refreshPreview();
+  },
+
+  _populatePageSelect() {
+    const sel = document.getElementById('te-preview-page-select');
+    if (!sel) return;
+    sel.innerHTML = '';
+    for (const p of (State.pages || [])) {
+      const opt = document.createElement('option');
+      opt.value = p.file;
+      opt.textContent = p.file;
+      sel.appendChild(opt);
+    }
+    // Default to index.html
+    const idx = Array.from(sel.options).findIndex(o => o.value === 'index.html');
+    if (idx >= 0) sel.selectedIndex = idx;
+  },
+
+  onPreviewPageChange(filename) {
+    this._refreshPreview(filename);
+  },
+
+  _refreshPreview(filename) {
+    const sel = document.getElementById('te-preview-page-select');
+    const file = filename || sel?.value || (State.pages?.[0]?.file);
+    if (!file) return;
+
+    const colors  = this._collectColors();
+    const fonts   = this._collectFonts();
+    const radius  = this._collectRadius();
+
+    // Build a temporary theme object and inject into preview
+    const tempTheme = { colors, fonts, radius };
+    Preview.renderPageWithTheme('theme-preview-iframe', file, tempTheme);
+  },
+
+  async save() {
+    if (!State.project) return;
+    const colors = this._collectColors();
+    const fonts  = this._collectFonts();
+    const radius = this._collectRadius();
+
+    State.project.theme = { colors, fonts, radius };
+    await ProjectManager.saveProjectMeta();
+
+    // Apply theme to all open previews
+    if (typeof ThemeEngine !== 'undefined') {
+      ThemeEngine.applyToProject(State.project.theme);
+    }
+
+    this._refreshSidebarSwatches();
+    Utils.showToast('Theme saved.', 'info');
+  },
+
+  _refreshSidebarSwatches() {
+    const theme = State.project?.theme;
+    const swatchWrap = document.getElementById('theme-sidebar-swatches');
+    const summaryEl  = document.getElementById('theme-sidebar-summary');
+    if (!swatchWrap) return;
+
+    if (!theme) {
+      swatchWrap.innerHTML = '<span style="font-size:10px;color:#444;padding:4px 0">No theme set</span>';
+      if (summaryEl) summaryEl.textContent = '';
+      return;
+    }
+
+    const colorOrder = ['surface', 'primary', 'primaryContainer', 'secondary', 'onSurface'];
+    swatchWrap.innerHTML = colorOrder.map(k => {
+      const c = theme.colors?.[k] || '#333';
+      return `<div class="theme-sidebar-swatch" title="${k}" style="background:${c}" onclick="ThemeEditor.open()"></div>`;
+    }).join('');
+
+    if (summaryEl) {
+      const headline = theme.fonts?.headline || '—';
+      const body     = theme.fonts?.body     || '—';
+      const radius   = theme.radius          || '—';
+      summaryEl.textContent = `${headline} / ${body} · ${radius}`;
+    }
+  },
+};
+
+// ─── Head Code Editor ─────────────────────────────────────────────────────────
+const HeadCodeEditor = {
+  _tabId: 'headcode-editor',
+  _cm: null,
+
+  open() {
+    if (!State.project) { Utils.showToast('Open a project first.', 'error'); return; }
+    UI.addTab(this._tabId, 'Head Code', 'code', () => this._activate());
+  },
+
+  _activate() {
+    UI.showView('headcode-editor');
+    const code = State.project?.headInject || '';
+
+    const wrap = document.getElementById('headcode-codemirror-wrap');
+    if (!wrap) return;
+
+    if (!this._cm) {
+      wrap.innerHTML = '';
+      this._cm = CodeMirror(wrap, {
+        value: code,
+        mode: 'htmlmixed',
+        theme: 'dracula',
+        lineNumbers: true,
+        lineWrapping: true,
+        autoCloseTags: true,
+        matchBrackets: true,
+        indentUnit: 2,
+        tabSize: 2,
+        extraKeys: {
+          'Ctrl-S': () => HeadCodeEditor.save(),
+          'Cmd-S': () => HeadCodeEditor.save(),
+        },
+      });
+    } else {
+      this._cm.setValue(code);
+      this._cm.clearHistory();
+    }
+
+    setTimeout(() => this._cm?.refresh(), 50);
+    this._refreshSidebarStatus();
+  },
+
+  async save() {
+    if (!State.project) return;
+    const code = this._cm ? this._cm.getValue() : '';
+    State.project.headInject = code;
+    await ProjectManager.saveProjectMeta();
+    this._refreshSidebarStatus();
+    Utils.showToast('Head code saved.', 'info');
+  },
+
+  _refreshSidebarStatus() {
+    const el = document.getElementById('headcode-sidebar-status');
+    if (!el) return;
+    const code = (State.project?.headInject || '').trim();
+    if (code) {
+      el.textContent = '✓ Has custom code';
+      el.className = 'headcode-sidebar-status has-code';
+    } else {
+      el.textContent = 'Empty';
+      el.className = 'headcode-sidebar-status';
+    }
   },
 };

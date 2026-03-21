@@ -144,6 +144,39 @@
         <div id="section-languages" class="sidebar-section-content"></div>
       </div>
 
+      <!-- Section: Theme -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-header" onclick="UI.toggleSection('theme')">
+          <span class="material-symbols-outlined section-icon" id="si-theme">expand_more</span>
+          <span class="section-label">Theme</span>
+        </div>
+        <div id="section-theme" class="sidebar-section-content">
+          <!-- Color swatches mini-preview -->
+          <div id="theme-sidebar-swatches" class="theme-sidebar-swatches"></div>
+          <!-- Font + radius summary -->
+          <div id="theme-sidebar-summary" class="theme-sidebar-summary"></div>
+          <button class="sidebar-action-btn" onclick="ThemeEditor.open()">
+            <span class="material-symbols-outlined" style="font-size:13px">palette</span>
+            Edit Theme
+          </button>
+        </div>
+      </div>
+
+      <!-- Section: Head Code -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-header" onclick="UI.toggleSection('headcode')">
+          <span class="material-symbols-outlined section-icon" id="si-headcode">expand_more</span>
+          <span class="section-label">Head Code</span>
+        </div>
+        <div id="section-headcode" class="sidebar-section-content">
+          <div id="headcode-sidebar-status" class="headcode-sidebar-status"></div>
+          <button class="sidebar-action-btn" onclick="HeadCodeEditor.open()">
+            <span class="material-symbols-outlined" style="font-size:13px">code</span>
+            Edit Head Code
+          </button>
+        </div>
+      </div>
+
     </div><!-- /sidebar-project -->
   </aside>
 
@@ -215,6 +248,50 @@
         </div>
         <!-- Lang select -->
         <select id="preview-lang-select" class="toolbar-select" onchange="App.setPreviewLang(this.value)"></select>
+      </div>
+
+      <!-- Page Metadata collapsible panel (above code+preview split) -->
+      <div id="page-meta-panel" class="page-meta-panel">
+        <div class="page-meta-header" onclick="PageEditor.toggleMeta()">
+          <span class="material-symbols-outlined" style="font-size:14px">data_object</span>
+          <span>Page Metadata</span>
+          <span style="flex:1"></span>
+          <span id="page-meta-chevron" class="material-symbols-outlined" style="font-size:16px;transition:transform .2s">chevron_right</span>
+        </div>
+        <div id="page-meta-fields" class="page-meta-fields hidden">
+          <div class="meta-fields-grid">
+            <div class="meta-field">
+              <label>Title <span class="meta-field-hint">(&lt;title&gt;)</span></label>
+              <input id="meta-title" type="text" placeholder="Page Title | Site Name" oninput="PageEditor.onMetaChange()">
+            </div>
+            <div class="meta-field">
+              <label>Description <span class="meta-field-hint">(meta name=description)</span></label>
+              <input id="meta-desc" type="text" placeholder="Brief page description for search engines…" oninput="PageEditor.onMetaChange()">
+            </div>
+            <div class="meta-field">
+              <label>OG Title <span class="meta-field-hint">(og:title)</span></label>
+              <input id="meta-og-title" type="text" placeholder="Leave empty to use Title" oninput="PageEditor.onMetaChange()">
+            </div>
+            <div class="meta-field">
+              <label>OG Description <span class="meta-field-hint">(og:description)</span></label>
+              <input id="meta-og-desc" type="text" placeholder="Leave empty to use Description" oninput="PageEditor.onMetaChange()">
+            </div>
+            <div class="meta-field">
+              <label>OG Image <span class="meta-field-hint">(og:image)</span></label>
+              <input id="meta-og-image" type="text" placeholder="assets/images/og-cover.jpg or https://…" oninput="PageEditor.onMetaChange()">
+            </div>
+            <div class="meta-field">
+              <label>Canonical URL <span class="meta-field-hint">(link rel=canonical)</span></label>
+              <input id="meta-canonical" type="text" placeholder="https://example.com/about.html" oninput="PageEditor.onMetaChange()">
+            </div>
+          </div>
+          <div class="meta-panel-footer">
+            <span class="meta-info-note">
+              <span class="material-symbols-outlined" style="font-size:12px;vertical-align:-2px">info</span>
+              Metadata is not written to the HTML source. It is saved in project.json and injected during Export.
+            </span>
+          </div>
+        </div>
       </div>
 
       <!-- Split: code + preview -->
@@ -296,6 +373,206 @@
         <div class="editor-content-wrap">
           <p id="sd-used-in" class="used-in-label"></p>
           <div id="sd-editor-content"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── View: Theme Editor ── -->
+    <div id="view-theme-editor" class="view-panel hidden">
+      <div class="editor-toolbar">
+        <span class="toolbar-filename">
+          <span class="material-symbols-outlined" style="font-size:14px;color:#a78bfa">palette</span>
+          Theme Editor
+        </span>
+        <div class="toolbar-spacer"></div>
+        <button class="toolbar-btn btn-save" id="btn-save-theme" onclick="ThemeEditor.save()">
+          <span class="material-symbols-outlined">save</span>
+          <span>Save Theme</span>
+        </button>
+      </div>
+      <div class="theme-editor-layout">
+        <!-- Left: controls -->
+        <div class="theme-editor-controls">
+          <!-- Live preview bar -->
+          <div id="te-preview-bar" class="theme-preview-bar" style="margin-bottom:20px">
+            <div class="theme-preview-swatch" id="te-swatch-surface" title="Surface"></div>
+            <div class="theme-preview-swatch" id="te-swatch-primary" title="Primary"></div>
+            <div class="theme-preview-swatch" id="te-swatch-primary-container" title="Primary Container"></div>
+            <div class="theme-preview-swatch" id="te-swatch-secondary" title="Secondary"></div>
+            <div class="theme-preview-swatch" id="te-swatch-on-surface" title="On-Surface (Text)"></div>
+            <span class="theme-preview-label">Live Preview</span>
+          </div>
+
+          <!-- Colors -->
+          <div class="theme-section-title">
+            <span class="material-symbols-outlined" style="font-size:13px">palette</span> Colors
+          </div>
+          <div class="theme-color-grid">
+            <div class="theme-color-row">
+              <label class="theme-color-label">Primary <span class="theme-color-hint">(accent)</span></label>
+              <div class="theme-color-input-wrap">
+                <input type="color" id="te-color-primary" class="theme-color-picker" oninput="ThemeEditor.onColorChange()">
+                <input type="text" id="te-color-primary-hex" class="theme-color-hex" maxlength="7" placeholder="#e9c176" oninput="ThemeEditor.onHexInput('primary')">
+              </div>
+            </div>
+            <div class="theme-color-row">
+              <label class="theme-color-label">Primary Container <span class="theme-color-hint">(dark accent)</span></label>
+              <div class="theme-color-input-wrap">
+                <input type="color" id="te-color-primaryContainer" class="theme-color-picker" oninput="ThemeEditor.onColorChange()">
+                <input type="text" id="te-color-primaryContainer-hex" class="theme-color-hex" maxlength="7" placeholder="#c5a059" oninput="ThemeEditor.onHexInput('primaryContainer')">
+              </div>
+            </div>
+            <div class="theme-color-row">
+              <label class="theme-color-label">Surface <span class="theme-color-hint">(background)</span></label>
+              <div class="theme-color-input-wrap">
+                <input type="color" id="te-color-surface" class="theme-color-picker" oninput="ThemeEditor.onColorChange()">
+                <input type="text" id="te-color-surface-hex" class="theme-color-hex" maxlength="7" placeholder="#131313" oninput="ThemeEditor.onHexInput('surface')">
+              </div>
+            </div>
+            <div class="theme-color-row">
+              <label class="theme-color-label">On-Surface <span class="theme-color-hint">(text color)</span></label>
+              <div class="theme-color-input-wrap">
+                <input type="color" id="te-color-onSurface" class="theme-color-picker" oninput="ThemeEditor.onColorChange()">
+                <input type="text" id="te-color-onSurface-hex" class="theme-color-hex" maxlength="7" placeholder="#e5e2e1" oninput="ThemeEditor.onHexInput('onSurface')">
+              </div>
+            </div>
+            <div class="theme-color-row">
+              <label class="theme-color-label">Secondary <span class="theme-color-hint">(muted accent)</span></label>
+              <div class="theme-color-input-wrap">
+                <input type="color" id="te-color-secondary" class="theme-color-picker" oninput="ThemeEditor.onColorChange()">
+                <input type="text" id="te-color-secondary-hex" class="theme-color-hex" maxlength="7" placeholder="#d5c5a7" oninput="ThemeEditor.onHexInput('secondary')">
+              </div>
+            </div>
+          </div>
+
+          <!-- Fonts -->
+          <div class="theme-section-title" style="margin-top:20px">
+            <span class="material-symbols-outlined" style="font-size:13px">text_fields</span> Fonts
+          </div>
+          <div class="theme-font-grid">
+            <div class="form-field" style="margin-bottom:10px">
+              <label>Headline / Display</label>
+              <select id="te-font-headline" onchange="ThemeEditor.onColorChange()">
+                <optgroup label="Serif / Editorial">
+                  <option value="Newsreader">Newsreader</option>
+                  <option value="Playfair Display">Playfair Display</option>
+                  <option value="Cormorant Garamond">Cormorant Garamond</option>
+                  <option value="EB Garamond">EB Garamond</option>
+                  <option value="DM Serif Display">DM Serif Display</option>
+                  <option value="Lora">Lora</option>
+                  <option value="Merriweather">Merriweather</option>
+                </optgroup>
+                <optgroup label="Sans / Display">
+                  <option value="Inter">Inter</option>
+                  <option value="Outfit">Outfit</option>
+                  <option value="Raleway">Raleway</option>
+                  <option value="Bebas Neue">Bebas Neue</option>
+                </optgroup>
+                <optgroup label="CJK">
+                  <option value="Noto Serif SC">Noto Serif SC</option>
+                  <option value="Noto Sans SC">Noto Sans SC</option>
+                  <option value="LXGW WenKai">LXGW WenKai</option>
+                </optgroup>
+              </select>
+            </div>
+            <div class="form-field" style="margin-bottom:10px">
+              <label>Body / Paragraph</label>
+              <select id="te-font-body" onchange="ThemeEditor.onColorChange()">
+                <optgroup label="Sans-serif">
+                  <option value="Manrope">Manrope</option>
+                  <option value="Inter">Inter</option>
+                  <option value="Plus Jakarta Sans">Plus Jakarta Sans</option>
+                  <option value="DM Sans">DM Sans</option>
+                  <option value="Nunito">Nunito</option>
+                  <option value="Poppins">Poppins</option>
+                  <option value="Source Sans 3">Source Sans 3</option>
+                  <option value="IBM Plex Sans">IBM Plex Sans</option>
+                  <option value="Rubik">Rubik</option>
+                </optgroup>
+                <optgroup label="CJK">
+                  <option value="Noto Sans SC">Noto Sans SC</option>
+                  <option value="Noto Serif SC">Noto Serif SC</option>
+                </optgroup>
+              </select>
+            </div>
+            <div class="form-field" style="margin-bottom:0">
+              <label>Label / UI / Caption</label>
+              <select id="te-font-label" onchange="ThemeEditor.onColorChange()">
+                <optgroup label="Geometric / Tech">
+                  <option value="Space Grotesk">Space Grotesk</option>
+                  <option value="Barlow">Barlow</option>
+                  <option value="Work Sans">Work Sans</option>
+                  <option value="Outfit">Outfit</option>
+                </optgroup>
+                <optgroup label="Monospace">
+                  <option value="Space Mono">Space Mono</option>
+                  <option value="IBM Plex Mono">IBM Plex Mono</option>
+                  <option value="JetBrains Mono">JetBrains Mono</option>
+                  <option value="Fira Code">Fira Code</option>
+                </optgroup>
+              </select>
+            </div>
+          </div>
+
+          <!-- Border Radius -->
+          <div class="theme-section-title" style="margin-top:20px">
+            <span class="material-symbols-outlined" style="font-size:13px">rounded_corner</span> Shape
+          </div>
+          <div class="theme-radius-group">
+            <button class="theme-radius-btn" data-radius="sharp" onclick="ThemeEditor.onRadiusSelect('sharp')">
+              <div class="radius-demo" style="border-radius:2px"></div>
+              <span>Sharp</span>
+            </button>
+            <button class="theme-radius-btn" data-radius="rounded" onclick="ThemeEditor.onRadiusSelect('rounded')">
+              <div class="radius-demo" style="border-radius:6px"></div>
+              <span>Rounded</span>
+            </button>
+            <button class="theme-radius-btn" data-radius="pill" onclick="ThemeEditor.onRadiusSelect('pill')">
+              <div class="radius-demo" style="border-radius:9999px"></div>
+              <span>Pill</span>
+            </button>
+          </div>
+          <small style="display:block;margin-top:8px;color:#3a3a54">Changes here are reflected in the preview immediately. Click Save Theme to persist.</small>
+        </div>
+
+        <!-- Right: live preview iframe -->
+        <div class="theme-editor-preview">
+          <div class="comp-panel-label" style="border-bottom:1px solid #111118">
+            <span class="material-symbols-outlined" style="font-size:12px">preview</span>
+            Live Preview
+            <span style="flex:1"></span>
+            <select id="te-preview-page-select" class="toolbar-select" style="font-size:10px;padding:2px 6px" onchange="ThemeEditor.onPreviewPageChange(this.value)"></select>
+          </div>
+          <iframe id="theme-preview-iframe" class="preview-iframe" style="flex:1;width:100%;border:none"></iframe>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── View: Head Code Editor ── -->
+    <div id="view-headcode-editor" class="view-panel hidden">
+      <div class="editor-toolbar">
+        <span class="toolbar-filename">
+          <span class="material-symbols-outlined" style="font-size:14px;color:#60a5fa">code</span>
+          Custom Head Code
+        </span>
+        <div class="toolbar-spacer"></div>
+        <button class="toolbar-btn btn-save" onclick="HeadCodeEditor.save()">
+          <span class="material-symbols-outlined">save</span>
+          <span>Save</span>
+        </button>
+      </div>
+      <div class="editor-scroll-area">
+        <div class="editor-content-wrap" style="max-width:860px">
+          <div style="background:#0a0a14;border:1px solid #1a1a2e;border-radius:8px;padding:14px 16px;margin-bottom:16px">
+            <div style="display:flex;align-items:flex-start;gap:10px">
+              <span class="material-symbols-outlined" style="font-size:16px;color:#60a5fa;flex-shrink:0;margin-top:1px">info</span>
+              <div>
+                <p style="font-size:12px;color:#aaa;margin:0 0 4px">This code is injected before <code style="color:#6366f1;background:#0d0d18;padding:1px 5px;border-radius:3px">&lt;/head&gt;</code> on <strong style="color:#e0e0e0">every exported page</strong> — all languages.</p>
+                <p style="font-size:11px;color:#555;margin:0">Use this for Google Analytics, Meta Pixel, hreflang tags, favicons, custom CSS/JS links, etc. Not rendered in the editor preview.</p>
+              </div>
+            </div>
+          </div>
+          <div id="headcode-codemirror-wrap" style="border:1px solid #1a1a2e;border-radius:6px;overflow:hidden;min-height:400px"></div>
         </div>
       </div>
     </div>
@@ -644,9 +921,9 @@
   </div>
 </div>
 
-<!-- Modal: Settings -->
+<!-- Modal: Settings (simplified — General only) -->
 <div id="modal-settings" class="modal-backdrop hidden">
-  <div class="modal modal-sm">
+  <div class="modal">
     <div class="modal-header">
       <span class="modal-title">Project Settings</span>
       <button class="modal-close" onclick="UI.closeModal('modal-settings')">
@@ -664,7 +941,22 @@
         <small>Base language cannot be changed after creation.</small>
       </div>
       <div id="settings-lang-info" class="form-field">
-        <p style="font-size:12px;color:#666"></p>
+        <p style="font-size:12px;color:#555"></p>
+      </div>
+      <div style="border-top:1px solid #111118;margin:16px 0 12px"></div>
+      <div class="form-field">
+        <label>Projects folder</label>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="settings-projects-path" style="flex:1;font-size:12px;color:#aaa;background:#0d0d18;padding:5px 10px;border-radius:4px;border:1px solid #1a1a2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Not configured</span>
+          <button class="btn-sm" style="width:auto" onclick="App.pickProjectsFolder()">Change</button>
+        </div>
+      </div>
+      <div class="form-field">
+        <label>Releases folder</label>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="settings-releases-path" style="flex:1;font-size:12px;color:#aaa;background:#0d0d18;padding:5px 10px;border-radius:4px;border:1px solid #1a1a2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Not configured</span>
+          <button class="btn-sm" style="width:auto" onclick="App.pickReleasesFolder()">Change</button>
+        </div>
       </div>
     </div>
     <div class="modal-footer">

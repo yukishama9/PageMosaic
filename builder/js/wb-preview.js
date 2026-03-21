@@ -150,7 +150,7 @@ const Preview = {
     Preview.renderCurrentPage();
   }, 500),
 
-  // ── Process page HTML: inject components, resolve templates ──────────────────
+  // ── Process page HTML: inject components, resolve templates, apply theme ──────
   _processPageHtml(html, filename, lang) {
     let processed = html;
 
@@ -159,6 +159,13 @@ const Preview = {
 
     // Resolve template tokens
     processed = this._resolveTokens(processed, filename, lang);
+
+    // Apply project theme (tailwind.config + Google Fonts) — preview mode
+    const theme = State.project?.theme;
+    if (theme) {
+      processed = ThemeEngine.injectConfig(processed, theme);
+      processed = ThemeEngine.injectFontsLink(processed, theme);
+    }
 
     return processed;
   },
@@ -393,6 +400,26 @@ const Preview = {
     });
   },
 
+  // ── Render a page with a temporary/unsaved theme (for Theme Editor preview) ──
+  async renderPageWithTheme(iframeId, filename, tempTheme) {
+    const rawHtml = await ProjectManager.readPage(filename);
+    if (!rawHtml) return;
+
+    let processed = rawHtml;
+
+    // inject components + resolve tokens (use current preview lang)
+    processed = this._injectComponents(processed, filename, State.previewLanguage);
+    processed = this._resolveTokens(processed, filename, State.previewLanguage);
+
+    // Apply temp theme
+    if (tempTheme) {
+      processed = ThemeEngine.injectConfig(processed, tempTheme);
+      processed = ThemeEngine.injectFontsLink(processed, tempTheme);
+    }
+
+    await this._writeIframe(iframeId, processed);
+  },
+
   // ── Change preview language ───────────────────────────────────────────────────
   setLanguage(lang) {
     State.previewLanguage = lang;
@@ -400,6 +427,290 @@ const Preview = {
     else if (State.activeView === 'component-editor' && State.activeComponent) {
       this.renderComponent(State.activeComponent);
     }
+  },
+};
+
+// ─── Theme Engine ─────────────────────────────────────────────────────────────
+// Generates a full Tailwind config from 5 seed colors + font + radius settings.
+// Uses lightweight HSL arithmetic to derive the complete M3-style token palette.
+const ThemeEngine = {
+
+  // ── HSL utilities ────────────────────────────────────────────────────────────
+  _hexToHsl(hex) {
+    let r = parseInt(hex.slice(1,3),16)/255;
+    let g = parseInt(hex.slice(3,5),16)/255;
+    let b = parseInt(hex.slice(5,7),16)/255;
+    const max = Math.max(r,g,b), min = Math.min(r,g,b);
+    let h, s, l = (max+min)/2;
+    if (max === min) { h = s = 0; }
+    else {
+      const d = max - min;
+      s = l > 0.5 ? d/(2-max-min) : d/(max+min);
+      switch (max) {
+        case r: h = ((g-b)/d + (g<b?6:0))/6; break;
+        case g: h = ((b-r)/d + 2)/6; break;
+        default: h = ((r-g)/d + 4)/6;
+      }
+    }
+    return [h*360, s*100, l*100];
+  },
+
+  _hslToHex(h, s, l) {
+    h = ((h%360)+360)%360; s = Math.max(0,Math.min(100,s))/100; l = Math.max(0,Math.min(100,l))/100;
+    const c = (1-Math.abs(2*l-1))*s;
+    const x = c*(1-Math.abs((h/60)%2-1));
+    const m = l - c/2;
+    let r=0,g=0,b=0;
+    if      (h<60)  { r=c; g=x; b=0; }
+    else if (h<120) { r=x; g=c; b=0; }
+    else if (h<180) { r=0; g=c; b=x; }
+    else if (h<240) { r=0; g=x; b=c; }
+    else if (h<300) { r=x; g=0; b=c; }
+    else            { r=c; g=0; b=x; }
+    const toHex = n => Math.round((n+m)*255).toString(16).padStart(2,'0');
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  },
+
+  // Adjust lightness by `delta` percentage points
+  _adjL(hex, delta) {
+    const [h,s,l] = this._hexToHsl(hex);
+    return this._hslToHex(h, s, l + delta);
+  },
+  // Adjust saturation by `delta` percentage points
+  _adjS(hex, delta) {
+    const [h,s,l] = this._hexToHsl(hex);
+    return this._hslToHex(h, s + delta, l);
+  },
+  // Mix two hex colors at ratio t (0=a, 1=b)
+  _mix(a, b, t) {
+    const ra=parseInt(a.slice(1,3),16), ga=parseInt(a.slice(3,5),16), ba=parseInt(a.slice(5,7),16);
+    const rb=parseInt(b.slice(1,3),16), gb=parseInt(b.slice(3,5),16), bb=parseInt(b.slice(5,7),16);
+    const r=Math.round(ra+(rb-ra)*t), g=Math.round(ga+(gb-ga)*t), bv=Math.round(ba+(bb-ba)*t);
+    return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${bv.toString(16).padStart(2,'0')}`;
+  },
+
+  // ── Derive full M3-style color token set from 5 seed colors ─────────────────
+  // Seeds: primary, primaryContainer, surface, onSurface, secondary
+  deriveM3Colors(seeds) {
+    const p   = seeds.primary          || '#e9c176';
+    const pc  = seeds.primaryContainer || this._adjL(p, -15);
+    const s   = seeds.surface          || '#131313';
+    const os  = seeds.onSurface        || '#e5e2e1';
+    const sec = seeds.secondary        || this._adjS(this._adjL(p, -5), -25);
+
+    // Determine if surface is dark or light
+    const [,,sL] = this._hexToHsl(s);
+    const isDark = sL < 50;
+
+    // On-primary: should be readable on primary background
+    const [,,pL] = this._hexToHsl(p);
+    const onP = pL > 55 ? this._adjL(s, isDark ? 5 : -5) : this._adjL(os, 0);
+
+    // Secondary-derived
+    const secContainer  = this._adjL(sec, isDark ? -20 : 20);
+    const onSec         = pL > 55 ? this._adjL(s, isDark ? 3 : -3) : os;
+    const onSecContainer= this._adjL(isDark ? s : os, isDark ? 15 : -15);
+
+    // Tertiary: hue-shifted version of primary
+    const [pH,,] = this._hexToHsl(p);
+    const tert          = this._hslToHex(pH + 30, 40, pL);
+    const tertContainer = this._adjL(tert, isDark ? -18 : 18);
+    const onTert        = pL > 55 ? this._adjL(s, isDark ? 5 : -5) : os;
+    const onTertContainer = this._adjL(isDark ? s : os, isDark ? 18 : -18);
+
+    // Surface tonal scale
+    const sStep = isDark ? 3 : -3;
+    const surfaceVariant = this._adjL(s, sStep * 5);
+
+    return {
+      // ── Primary ──────────────────────────────────────────────────────────────
+      "primary":                    p,
+      "primary-fixed":              this._adjL(p,  isDark ? 18 : -18),
+      "primary-fixed-dim":          p,
+      "on-primary":                 onP,
+      "primary-container":          pc,
+      "on-primary-container":       this._adjL(isDark ? s : os, isDark ? 10 : -10),
+      "on-primary-fixed":           this._adjL(isDark ? s : os, isDark ? 5 : -5),
+      "on-primary-fixed-variant":   this._adjL(isDark ? s : os, isDark ? 15 : -15),
+      "surface-tint":               p,
+      "inverse-primary":            this._adjL(pc, isDark ? 20 : -20),
+      // ── Secondary ────────────────────────────────────────────────────────────
+      "secondary":                  sec,
+      "secondary-fixed":            this._adjL(sec, isDark ? 20 : -20),
+      "secondary-fixed-dim":        sec,
+      "on-secondary":               onSec,
+      "secondary-container":        secContainer,
+      "on-secondary-container":     onSecContainer,
+      "on-secondary-fixed":         this._adjL(isDark ? s : os, isDark ? 5 : -5),
+      "on-secondary-fixed-variant": this._adjL(isDark ? s : os, isDark ? 20 : -20),
+      // ── Tertiary ─────────────────────────────────────────────────────────────
+      "tertiary":                   tert,
+      "tertiary-fixed":             this._adjL(tert, isDark ? 20 : -20),
+      "tertiary-fixed-dim":         tert,
+      "on-tertiary":                onTert,
+      "tertiary-container":         tertContainer,
+      "on-tertiary-container":      onTertContainer,
+      "on-tertiary-fixed":          this._adjL(isDark ? s : os, isDark ? 5 : -5),
+      "on-tertiary-fixed-variant":  this._adjL(isDark ? s : os, isDark ? 22 : -22),
+      // ── Surface scale ─────────────────────────────────────────────────────────
+      "surface":                    s,
+      "surface-dim":                s,
+      "surface-bright":             this._adjL(s, sStep * 6),
+      "surface-variant":            surfaceVariant,
+      "surface-container-lowest":   this._adjL(s, sStep * 1),
+      "surface-container-low":      this._adjL(s, sStep * 2),
+      "surface-container":          this._adjL(s, sStep * 3),
+      "surface-container-high":     this._adjL(s, sStep * 4),
+      "surface-container-highest":  this._adjL(s, sStep * 5),
+      "background":                 s,
+      // ── On-surface ───────────────────────────────────────────────────────────
+      "on-surface":                 os,
+      "on-background":              os,
+      "on-surface-variant":         this._mix(os, s, 0.35),
+      "inverse-surface":            os,
+      "inverse-on-surface":         this._adjL(s, sStep * 5),
+      "outline":                    this._mix(os, s, 0.6),
+      "outline-variant":            this._mix(os, s, 0.8),
+      // ── Error (fixed M3 defaults) ─────────────────────────────────────────────
+      "error":                      "#ffb4ab",
+      "on-error":                   "#690005",
+      "error-container":            "#93000a",
+      "on-error-container":         "#ffdad6",
+    };
+  },
+
+  // ── Build the Google Fonts URL for the 3 selected fonts ─────────────────────
+  buildGoogleFontsUrl(fonts) {
+    const headline = fonts.headline || 'Newsreader';
+    const body     = fonts.body     || 'Manrope';
+    const label    = fonts.label    || 'Space Grotesk';
+
+    // Font → Google Fonts query mapping
+    const fontMap = {
+      'Newsreader':         'Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800',
+      'Playfair Display':   'Playfair+Display:ital,wght@0,400..900;1,400..900',
+      'Cormorant Garamond': 'Cormorant+Garamond:ital,wght@0,300..700;1,300..700',
+      'EB Garamond':        'EB+Garamond:ital,wght@0,400..800;1,400..800',
+      'DM Serif Display':   'DM+Serif+Display:ital@0;1',
+      'Lora':               'Lora:ital,wght@0,400..700;1,400..700',
+      'Merriweather':       'Merriweather:ital,wght@0,300..900;1,300..900',
+      'Inter':              'Inter:wght@300..700',
+      'Outfit':             'Outfit:wght@300..700',
+      'Raleway':            'Raleway:ital,wght@0,300..800;1,300..800',
+      'Bebas Neue':         'Bebas+Neue',
+      'Noto Serif SC':      'Noto+Serif+SC:wght@300..900',
+      'Noto Sans SC':       'Noto+Sans+SC:wght@300..700',
+      'LXGW WenKai':        'LXGW+WenKai',
+      'Manrope':            'Manrope:wght@200..800',
+      'Plus Jakarta Sans':  'Plus+Jakarta+Sans:wght@300..700',
+      'DM Sans':            'DM+Sans:wght@300..700',
+      'Nunito':             'Nunito:wght@300..800',
+      'Poppins':            'Poppins:wght@300..700',
+      'Source Sans 3':      'Source+Sans+3:wght@300..700',
+      'IBM Plex Sans':      'IBM+Plex+Sans:wght@300..700',
+      'Rubik':              'Rubik:wght@300..700',
+      'Space Grotesk':      'Space+Grotesk:wght@300..700',
+      'Barlow':             'Barlow:wght@300..700',
+      'Work Sans':          'Work+Sans:wght@300..700',
+      'Space Mono':         'Space+Mono:ital,wght@0,400;0,700;1,400;1,700',
+      'IBM Plex Mono':      'IBM+Plex+Mono:wght@300..600',
+      'JetBrains Mono':     'JetBrains+Mono:wght@300..700',
+      'Fira Code':          'Fira+Code:wght@300..700',
+    };
+
+    const families = [...new Set([headline, body, label])]
+      .map(f => fontMap[f] || encodeURIComponent(f))
+      .map(f => `family=${f}`)
+      .join('&');
+
+    return `https://fonts.googleapis.com/css2?${families}&display=swap`;
+  },
+
+  // ── Radius presets ───────────────────────────────────────────────────────────
+  _radiusPresets: {
+    sharp:   { DEFAULT: '0.125rem', lg: '0.25rem',  xl: '0.5rem',  full: '0.75rem' },
+    rounded: { DEFAULT: '0.375rem', lg: '0.5rem',   xl: '0.75rem', full: '1.5rem'  },
+    pill:    { DEFAULT: '0.75rem',  lg: '1rem',     xl: '1.5rem',  full: '9999px'  },
+  },
+
+  // ── Generate full tailwind.config JS string ──────────────────────────────────
+  generateConfigScript(theme) {
+    if (!theme) return null;
+    const colors   = this.deriveM3Colors(theme.colors || {});
+    const fonts    = theme.fonts  || {};
+    const radius   = this._radiusPresets[theme.radius || 'sharp'];
+    const headline = fonts.headline || 'Newsreader';
+    const body     = fonts.body     || 'Manrope';
+    const label    = fonts.label    || 'Space Grotesk';
+
+    const cfg = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors,
+          fontFamily: {
+            headline: [headline],
+            body:     [body],
+            label:    [label],
+          },
+          borderRadius: radius,
+        },
+      },
+    };
+
+    return `tailwind.config = ${JSON.stringify(cfg, null, 2)}`;
+  },
+
+  // ── Inject / replace tailwind.config into an HTML string ─────────────────────
+  // Replaces <script id="tailwind-config">…</script> if present.
+  // If not present but <script src="…tailwindcss…"> exists, injects after it.
+  // Does nothing if Tailwind CDN is not in the page at all.
+  injectConfig(html, theme) {
+    if (!theme) return html;
+    const script = this.generateConfigScript(theme);
+    if (!script) return html;
+
+    const tag = `<script id="tailwind-config">\n${script}\n</script>`;
+
+    // Replace existing <script id="tailwind-config">…</script>
+    const existing = /<script[^>]*\bid="tailwind-config"[^>]*>[\s\S]*?<\/script>/i;
+    if (existing.test(html)) {
+      return html.replace(existing, tag);
+    }
+
+    // No existing block — inject after the Tailwind CDN <script> tag
+    const cdnScript = /(<script[^>]*cdn\.tailwindcss\.com[^>]*>[\s\S]*?<\/script>)/i;
+    if (cdnScript.test(html)) {
+      return html.replace(cdnScript, `$1\n${tag}`);
+    }
+
+    // Inject before </head> as last resort
+    if (/<\/head>/i.test(html)) {
+      return html.replace(/<\/head>/i, `${tag}\n</head>`);
+    }
+
+    return html;
+  },
+
+  // ── Replace Google Fonts <link> in HTML to match selected fonts ──────────────
+  // Replaces the first googleapis.com/css2 <link> (not Material Symbols) or
+  // injects a new one before </head> if none found.
+  injectFontsLink(html, theme) {
+    if (!theme?.fonts) return html;
+    const url  = this.buildGoogleFontsUrl(theme.fonts);
+    const tag  = `<link href="${url}" rel="stylesheet"/>`;
+
+    // Match a Google Fonts link that isn't the Material Symbols one
+    const existing = /<link[^>]*fonts\.googleapis\.com\/css2\?(?!family=Material)[^>]*>/i;
+    if (existing.test(html)) {
+      return html.replace(existing, tag);
+    }
+
+    // Inject before </head>
+    if (/<\/head>/i.test(html)) {
+      return html.replace(/<\/head>/i, `${tag}\n</head>`);
+    }
+    return html;
   },
 };
 
@@ -456,6 +767,19 @@ const Exporter = {
           // Process: inject components + resolve tokens for this lang
           let exported = Preview._processPageHtml(rawHtml, page.file, lang);
 
+          // Inject page metadata (title, description, OG tags, canonical)
+          exported = this._injectPageMetadata(exported, page, lang);
+
+          // Inject theme (tailwind.config + Google Fonts) — export mode
+          const theme = State.project?.theme;
+          if (theme) {
+            exported = ThemeEngine.injectConfig(exported, theme);
+            exported = ThemeEngine.injectFontsLink(exported, theme);
+          }
+
+          // Inject custom head code (from Project Settings, all pages, export only)
+          exported = this._injectHeadCode(exported);
+
           // Fix asset paths for non-base languages (adjust relative paths up one level)
           if (!isBase) {
             exported = this._fixRelativePaths(exported);
@@ -482,6 +806,82 @@ const Exporter = {
       Utils.showToast('Export failed.', 'error');
       console.error('Export error:', e);
     }
+  },
+
+  // ── Inject page metadata into <head> ─────────────────────────────────────────
+  // Inserts/replaces <title>, <meta name="description">, OG tags, and canonical
+  // based on the page.meta object stored in project.json.
+  // Only injects fields that have a non-empty value.
+  _injectPageMetadata(html, page, lang) {
+    const meta = page?.meta;
+    if (!meta) return html;
+
+    const title       = meta.title       || '';
+    const desc        = meta.description  || '';
+    const ogTitle     = meta.ogTitle      || title;
+    const ogDesc      = meta.ogDescription || desc;
+    const ogImage     = meta.ogImage      || '';
+    const canonical   = meta.canonical    || '';
+
+    // Build the tags to inject
+    let tags = '';
+
+    if (title) {
+      // Replace existing <title> or inject new one
+      if (/<title[\s>]/i.test(html)) {
+        html = html.replace(/<title[^>]*>[\s\S]*?<\/title>/i, `<title>${title}</title>`);
+      } else {
+        tags += `  <title>${title}</title>\n`;
+      }
+    }
+
+    if (desc) {
+      // Remove existing description meta if present
+      html = html.replace(/<meta\s[^>]*name=["']description["'][^>]*>/gi, '');
+      tags += `  <meta name="description" content="${desc.replace(/"/g, '&quot;')}">\n`;
+    }
+    if (ogTitle) {
+      html = html.replace(/<meta\s[^>]*property=["']og:title["'][^>]*>/gi, '');
+      tags += `  <meta property="og:title" content="${ogTitle.replace(/"/g, '&quot;')}">\n`;
+    }
+    if (ogDesc) {
+      html = html.replace(/<meta\s[^>]*property=["']og:description["'][^>]*>/gi, '');
+      tags += `  <meta property="og:description" content="${ogDesc.replace(/"/g, '&quot;')}">\n`;
+    }
+    if (ogImage) {
+      html = html.replace(/<meta\s[^>]*property=["']og:image["'][^>]*>/gi, '');
+      tags += `  <meta property="og:image" content="${ogImage.replace(/"/g, '&quot;')}">\n`;
+    }
+    if (canonical) {
+      html = html.replace(/<link\s[^>]*rel=["']canonical["'][^>]*>/gi, '');
+      tags += `  <link rel="canonical" href="${canonical.replace(/"/g, '&quot;')}">\n`;
+    }
+
+    // Inject remaining tags before </head>
+    if (tags) {
+      if (/<\/head>/i.test(html)) {
+        html = html.replace(/<\/head>/i, `${tags}</head>`);
+      } else {
+        html = tags + html;
+      }
+    }
+
+    return html;
+  },
+
+  // ── Inject custom head code (Project Settings → Custom Head Code) ────────────
+  // Appends user-defined code immediately before </head> on every exported page.
+  // This is intentionally NOT applied during preview — scripts like GA would fire
+  // in the editor and are irrelevant / potentially disruptive during development.
+  _injectHeadCode(html) {
+    const code = State.project?.headInject;
+    if (!code || !code.trim()) return html;
+    const snippet = '\n' + code.trim() + '\n';
+    if (/<\/head>/i.test(html)) {
+      return html.replace(/<\/head>/i, `${snippet}</head>`);
+    }
+    // No </head> found — append to start as a fallback
+    return snippet + html;
   },
 
   // ── Fix asset relative paths for language subdirectory pages ─────────────────

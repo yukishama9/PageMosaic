@@ -486,8 +486,11 @@ const App = {
 
   async saveSettings() {
     if (!State.project) return;
+
+    // General only — Theme and Head Code now have their own editors
     State.project.title = document.getElementById('settings-title').value.trim() || State.project.title;
     document.getElementById('project-name-display').textContent = State.project.title;
+
     UI.closeModal('modal-settings');
     await ProjectManager.saveProjectMeta();
     Utils.showToast('Settings saved.', 'info');

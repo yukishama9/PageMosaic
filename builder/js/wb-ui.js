@@ -4,12 +4,12 @@ const UI = {
 
   // ── Initialize UI ────────────────────────────────────────────────────────────
   init() {
-    this._sectionStates = { pages: true, components: true, 'shared-data': true, languages: true };
+    this._sectionStates = { pages: true, components: true, 'shared-data': true, languages: true, theme: true, headcode: true };
   },
 
   // ── Show a view ──────────────────────────────────────────────────────────────
   showView(name) {
-    const views = ['welcome', 'page-editor', 'component-editor', 'shared-data-editor', 'i18n-editor'];
+    const views = ['welcome', 'page-editor', 'component-editor', 'shared-data-editor', 'i18n-editor', 'theme-editor', 'headcode-editor'];
     views.forEach(v => {
       const el = document.getElementById(`view-${v}`);
       if (el) el.classList.toggle('hidden', v !== name);
@@ -31,6 +31,10 @@ const UI = {
     this.renderSharedData();
     this.renderLanguages();
     this.updatePreviewLangSelect();
+
+    // Refresh Theme + HeadCode sidebar sections
+    if (typeof ThemeEditor !== 'undefined') ThemeEditor._refreshSidebarSwatches();
+    if (typeof HeadCodeEditor !== 'undefined') HeadCodeEditor._refreshSidebarStatus();
   },
 
   // ── Render sidebar sections ──────────────────────────────────────────────────
@@ -228,11 +232,26 @@ const UI = {
   // ── Settings modal ───────────────────────────────────────────────────────────
   populateSettings() {
     if (!State.project) return;
+
     document.getElementById('settings-title').value = State.project.title || '';
     document.getElementById('settings-base-lang').value = State.project.baseLanguage || '';
     const langs = (State.project.languages || []).map(l => `${l.code} (${l.label || l.code})`).join(', ');
     const info = document.querySelector('#settings-lang-info p');
     if (info) info.textContent = `Languages: ${langs}`;
+
+    // Folder paths
+    const projectsPath = document.getElementById('settings-projects-path');
+    const releasesPath = document.getElementById('settings-releases-path');
+    if (projectsPath) {
+      projectsPath.textContent = State.workspaceProjectsHandle?.name
+        ? `…/${State.workspaceProjectsHandle.name}`
+        : 'Not configured';
+    }
+    if (releasesPath) {
+      releasesPath.textContent = State.workspaceReleasesHandle?.name
+        ? `…/${State.workspaceReleasesHandle.name}`
+        : 'Not configured';
+    }
   },
 
   // ── Insert component picker ──────────────────────────────────────────────────

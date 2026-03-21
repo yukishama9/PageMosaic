@@ -465,6 +465,11 @@ const ProjectManager = {
       await FileHandler.writeFile(dirHandle, 'index.html', stampedIndex);
     }
 
+    // Pre-extract all <style> blocks from the index template (for deduplication)
+    const indexStyleContents = new Set(
+      [...stampedIndex.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map(m => m[1].trim())
+    );
+
     for (const pageEntry of otherPages) {
       try {
         const pageHtml = await FileHandler.readFile(dirHandle, pageEntry.name) || '';
@@ -475,6 +480,15 @@ const ProjectManager = {
         // Preserve this page's <title>
         const titleMatch = pageHtml.match(/<title[^>]*>[\s\S]*?<\/title>/i);
         const pageTitle = titleMatch ? titleMatch[0] : null;
+
+        // Collect page-specific <style> blocks (those NOT already present in index template)
+        const pageStyleBlocks = [];
+        for (const m of pageHtml.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)) {
+          const content = m[1].trim();
+          if (content && !indexStyleContents.has(content)) {
+            pageStyleBlocks.push(`<style>\n${content}\n</style>`);
+          }
+        }
 
         // Start with the stamped index as template
         let result = stampedIndex;
@@ -493,6 +507,16 @@ const ProjectManager = {
         // Restore this page's <title>
         if (pageTitle) {
           result = result.replace(/<title[^>]*>[\s\S]*?<\/title>/i, pageTitle);
+        }
+
+        // Inject page-specific <style> blocks before </head>
+        if (pageStyleBlocks.length > 0) {
+          const injection = pageStyleBlocks.join('\n');
+          if (/<\/head>/i.test(result)) {
+            result = result.replace(/<\/head>/i, `${injection}\n</head>`);
+          } else {
+            result = injection + '\n' + result;
+          }
         }
 
         await FileHandler.writeFile(dirHandle, pageEntry.name, result);
