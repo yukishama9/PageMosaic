@@ -239,6 +239,15 @@ const UI = {
     const info = document.querySelector('#settings-lang-info p');
     if (info) info.textContent = `Languages: ${langs}`;
 
+    // CSS Mode
+    const cssModeEl = document.getElementById('settings-css-mode');
+    const cssHintEl = document.getElementById('settings-css-mode-hint');
+    if (cssModeEl) {
+      cssModeEl.value = State.project.cssMode || 'tailwind-cdn';
+      this._updateCssModeHint(cssModeEl.value, cssHintEl);
+      cssModeEl.onchange = () => this._updateCssModeHint(cssModeEl.value, cssHintEl);
+    }
+
     // Folder paths
     const projectsPath = document.getElementById('settings-projects-path');
     const releasesPath = document.getElementById('settings-releases-path');
@@ -252,6 +261,17 @@ const UI = {
         ? `…/${State.workspaceReleasesHandle.name}`
         : 'Not configured';
     }
+  },
+
+  // ── CSS Mode hint text ────────────────────────────────────────────────────────
+  _updateCssModeHint(mode, hintEl) {
+    if (!hintEl) return;
+    const hints = {
+      'tailwind-cdn': 'Tailwind CSS is loaded from CDN. Theme colors & fonts are injected automatically at runtime and on export.',
+      'tailwind-local': 'Uses a locally compiled tailwind.css. Theme config is saved but you must recompile CSS manually with the Tailwind CLI after changes.',
+      'custom': 'No Tailwind. Theme Editor is disabled. Manage your own CSS files directly in the project folder.',
+    };
+    hintEl.textContent = hints[mode] || '';
   },
 
   // ── Insert component picker ──────────────────────────────────────────────────

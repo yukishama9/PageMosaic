@@ -239,6 +239,11 @@ const ProjectManager = {
       langEntries.push({ code: lang.code, display: lang.display || lang.code.toUpperCase(), label: lang.code, isBase: false });
     }
 
+    // Detect CSS mode from index.html (or first HTML file)
+    const primaryHtmlFile = htmlFiles.find(f => f.name === 'index.html') || htmlFiles[0];
+    const primaryHtmlContent = await FileHandler.readFile(destHandle, primaryHtmlFile.name) || '';
+    const detectedCssMode = this._detectCssMode(primaryHtmlContent);
+
     // Build and write project.json (initial — before sync)
     const project = {
       name: projectName,
@@ -248,6 +253,7 @@ const ProjectManager = {
       pages: htmlFiles.map(f => ({ file: f.name, title: Utils.basename(f.name) })),
       components: componentMetas,
       sharedData: sharedDataMetas,
+      cssMode: detectedCssMode,
       importedFrom: srcHandle.name,
       created: Utils.formatDate(),
       lastModified: Utils.formatDate(),
@@ -1020,6 +1026,24 @@ const ProjectManager = {
     }
   },
 
+  // ── Detect CSS mode from HTML content ────────────────────────────────────────
+  // Returns: 'tailwind-cdn' | 'tailwind-local' | 'custom'
+  _detectCssMode(htmlContent) {
+    if (!htmlContent) return 'custom';
+    if (htmlContent.includes('cdn.tailwindcss.com')) return 'tailwind-cdn';
+    // Check for local tailwind link (e.g. assets/css/tailwind.css)
+    if (/assets\/css\/tailwind\.css/.test(htmlContent) ||
+        /tailwind-config/.test(htmlContent)) return 'tailwind-local';
+    return 'custom';
+  },
+
+  // ── Update cssMode in project.json and State ──────────────────────────────────
+  async saveCssMode(mode) {
+    if (!State.project) return;
+    State.project.cssMode = mode;
+    await this.saveProjectMeta();
+  },
+
   // ── Internal: scaffold a brand new project ───────────────────────────────────
   async _scaffoldProject(handle, name, title, baseLang) {
     const compDir = await FileHandler.getDir(handle, 'components', true);
@@ -1103,6 +1127,7 @@ const ProjectManager = {
         { id: 'social-links', label: 'Social Links', file: 'social-links.json' },
         { id: 'languages', label: 'Language Switcher', file: 'languages.json' },
       ],
+      cssMode: 'tailwind-cdn',
       created: Utils.formatDate(),
       lastModified: Utils.formatDate(),
     };

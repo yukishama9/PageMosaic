@@ -39,6 +39,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Reveal a path in the OS file explorer
   showInFolder: (targetPath) => ipcRenderer.invoke('shell:showInFolder', targetPath),
 
+  // ── Tailwind compilation ───────────────────────────────────────────────────
+
+  // Write tailwind.config.js and run `npx tailwindcss -i input.css -o assets/css/tailwind.css`
+  // in the given dirPath. Returns { success, stdout, stderr, error }
+  compileTailwind: (dirPath, configScript) =>
+    ipcRenderer.invoke('tailwind:compile', { dirPath, configScript }),
+
   // ── App info ───────────────────────────────────────────────────────────────
 
   // Expose platform string so the renderer can adapt UI if needed

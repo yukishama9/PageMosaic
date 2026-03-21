@@ -160,12 +160,16 @@ const Preview = {
     // Resolve template tokens
     processed = this._resolveTokens(processed, filename, lang);
 
-    // Apply project theme (tailwind.config + Google Fonts) — preview mode
+    // Apply project theme based on cssMode — preview mode
+    const cssMode = State.project?.cssMode || 'tailwind-cdn';
     const theme = State.project?.theme;
-    if (theme) {
+    if (theme && cssMode === 'tailwind-cdn') {
       processed = ThemeEngine.injectConfig(processed, theme);
       processed = ThemeEngine.injectFontsLink(processed, theme);
+    } else if (theme && cssMode === 'tailwind-local') {
+      processed = ThemeEngine.injectFontsLink(processed, theme);
     }
+    // cssMode === 'custom': no ThemeEngine injection
 
     return processed;
   },
@@ -411,11 +415,15 @@ const Preview = {
     processed = this._injectComponents(processed, filename, State.previewLanguage);
     processed = this._resolveTokens(processed, filename, State.previewLanguage);
 
-    // Apply temp theme
-    if (tempTheme) {
+    // Apply temp theme based on cssMode (Theme Editor preview)
+    const cssMode = State.project?.cssMode || 'tailwind-cdn';
+    if (tempTheme && cssMode === 'tailwind-cdn') {
       processed = ThemeEngine.injectConfig(processed, tempTheme);
       processed = ThemeEngine.injectFontsLink(processed, tempTheme);
+    } else if (tempTheme && cssMode === 'tailwind-local') {
+      processed = ThemeEngine.injectFontsLink(processed, tempTheme);
     }
+    // cssMode === 'custom': no ThemeEngine injection
 
     await this._writeIframe(iframeId, processed);
   },
@@ -770,12 +778,16 @@ const Exporter = {
           // Inject page metadata (title, description, OG tags, canonical)
           exported = this._injectPageMetadata(exported, page, lang);
 
-          // Inject theme (tailwind.config + Google Fonts) — export mode
+          // Inject theme based on cssMode — export mode
+          const cssMode = State.project?.cssMode || 'tailwind-cdn';
           const theme = State.project?.theme;
-          if (theme) {
+          if (theme && cssMode === 'tailwind-cdn') {
             exported = ThemeEngine.injectConfig(exported, theme);
             exported = ThemeEngine.injectFontsLink(exported, theme);
+          } else if (theme && cssMode === 'tailwind-local') {
+            exported = ThemeEngine.injectFontsLink(exported, theme);
           }
+          // cssMode === 'custom': no ThemeEngine injection
 
           // Inject custom head code (from Project Settings, all pages, export only)
           exported = this._injectHeadCode(exported);

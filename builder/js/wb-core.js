@@ -8,6 +8,7 @@ const State = {
 
   // File System handles
   projectHandle: null,       // FileSystemDirectoryHandle for current project
+  projectFsPath: null,       // Absolute filesystem path (Electron only) — used for Tailwind auto-compile
 
   // Loaded project data
   project: null,             // project.json content

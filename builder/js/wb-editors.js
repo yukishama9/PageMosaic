@@ -676,10 +676,55 @@ const ThemeEditor = {
 
   _activate() {
     UI.showView('theme-editor');
+    this._renderCssModeNotice();
     this._loadValues();
     this._populatePageSelect();
     this._refreshPreview();
     this._refreshSidebarSwatches();
+  },
+
+  // ── CSS mode notice banner ────────────────────────────────────────────────────
+  _renderCssModeNotice() {
+    const cssMode = State.project?.cssMode || 'tailwind-cdn';
+    const noticeEl = document.getElementById('theme-editor-css-notice');
+    if (!noticeEl) return;
+
+    const hasElectron = typeof window.electronAPI !== 'undefined';
+
+    const notices = {
+      'tailwind-cdn': '',
+      'tailwind-local': hasElectron
+        ? `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 14px;background:#0a1a0a;border:1px solid #166534;border-radius:6px;margin-bottom:16px">
+          <span class="material-symbols-outlined" style="font-size:16px;color:#4ade80;flex-shrink:0;margin-top:1px">auto_fix_high</span>
+          <div>
+            <p style="font-size:12px;color:#86efac;font-weight:600;margin:0 0 3px">Local CSS Mode — Auto-compile enabled</p>
+            <p style="font-size:11px;color:#166534;line-height:1.5;margin:0">Saving the theme will automatically write <code style="background:#071207;padding:1px 4px;border-radius:3px">tailwind.config.js</code> and recompile <code style="background:#071207;padding:1px 4px;border-radius:3px">assets/css/tailwind.css</code> in your project folder. You'll be asked to confirm the folder on first compile.</p>
+          </div>
+        </div>`
+        : `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 14px;background:#1a1200;border:1px solid #78350f;border-radius:6px;margin-bottom:16px">
+          <span class="material-symbols-outlined" style="font-size:16px;color:#f59e0b;flex-shrink:0;margin-top:1px">warning</span>
+          <div>
+            <p style="font-size:12px;color:#fbbf24;font-weight:600;margin:0 0 3px">Local CSS Mode</p>
+            <p style="font-size:11px;color:#a16207;line-height:1.5;margin:0">Color & font changes update the theme config only. Run <code style="background:#0f0900;padding:1px 4px;border-radius:3px">npx tailwindcss -i input.css -o assets/css/tailwind.css</code> in your project folder to recompile. (Auto-compile requires Electron mode.)</p>
+          </div>
+        </div>`,
+      'custom': `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 14px;background:#0a0a1a;border:1px solid #2e2e4e;border-radius:6px;margin-bottom:16px">
+        <span class="material-symbols-outlined" style="font-size:16px;color:#6366f1;flex-shrink:0;margin-top:1px">info</span>
+        <div>
+          <p style="font-size:12px;color:#818cf8;font-weight:600;margin:0 0 3px">Custom CSS Mode</p>
+          <p style="font-size:11px;color:#4a4a6a;line-height:1.5;margin:0">This project uses custom/pre-built CSS. The Theme Editor does not apply to your stylesheets. Edit your CSS files directly.</p>
+        </div>
+      </div>`,
+    };
+
+    noticeEl.innerHTML = notices[cssMode] || '';
+
+    // Disable interactive controls in 'custom' mode
+    const controls = document.getElementById('theme-editor-controls');
+    if (controls) {
+      controls.style.opacity = cssMode === 'custom' ? '0.35' : '';
+      controls.style.pointerEvents = cssMode === 'custom' ? 'none' : '';
+    }
   },
 
   _loadValues() {
@@ -829,13 +874,56 @@ const ThemeEditor = {
     State.project.theme = { colors, fonts, radius };
     await ProjectManager.saveProjectMeta();
 
-    // Apply theme to all open previews
-    if (typeof ThemeEngine !== 'undefined') {
-      ThemeEngine.applyToProject(State.project.theme);
+    this._refreshSidebarSwatches();
+
+    const cssMode = State.project.cssMode || 'tailwind-cdn';
+    if (cssMode === 'tailwind-local') {
+      // Auto-compile if in Electron; otherwise just show save confirmation
+      await this._compileLocalTailwind();
+    } else {
+      Utils.showToast('Theme saved.', 'info');
+    }
+  },
+
+  // ── Auto-compile Tailwind CSS (tailwind-local mode, Electron only) ───────────
+  async _compileLocalTailwind() {
+    if (typeof window.electronAPI === 'undefined') {
+      Utils.showToast('Theme saved. Run Tailwind CLI manually to recompile CSS.', 'info');
+      return;
     }
 
-    this._refreshSidebarSwatches();
-    Utils.showToast('Theme saved.', 'info');
+    // Get or prompt for the project's filesystem path
+    if (!State.projectFsPath) {
+      Utils.showToast('Select your project folder to enable auto-compile…', 'info');
+      const picked = await window.electronAPI.openDirectory({
+        title: 'Select project folder (where tailwind.config.js lives)',
+      });
+      if (!picked) {
+        Utils.showToast('Theme saved. Compilation cancelled — folder not selected.', 'warn');
+        return;
+      }
+      State.projectFsPath = picked;
+    }
+
+    const configScript = ThemeEngine.generateConfigScript(State.project?.theme);
+    if (!configScript) {
+      Utils.showToast('Could not generate Tailwind config.', 'error');
+      return;
+    }
+
+    Utils.showToast('Compiling Tailwind CSS…', 'info');
+
+    const result = await window.electronAPI.compileTailwind(State.projectFsPath, configScript);
+
+    if (result.success) {
+      Utils.showToast('✓ Theme saved & Tailwind CSS recompiled.', 'info');
+      // Refresh preview to pick up the new compiled CSS
+      if (State.activeView === 'page-editor') Preview.renderCurrentPage();
+      else if (State.activeView === 'theme-editor') this._refreshPreview();
+    } else {
+      Utils.showToast(`Theme saved, but compile failed: ${result.error || result.stderr || 'unknown error'}`, 'error', 6000);
+      console.error('[Tailwind compile]', result);
+    }
   },
 
   _refreshSidebarSwatches() {

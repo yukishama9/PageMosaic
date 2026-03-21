@@ -322,6 +322,7 @@ const App = {
     UI.clearSidebar();
     State.project = null;
     State.projectHandle = null;
+    State.projectFsPath = null;   // Clear cached filesystem path (used by Tailwind auto-compile)
     State.pages = [];
     State.components = {};
     State.sharedData = {};
@@ -491,8 +492,20 @@ const App = {
     State.project.title = document.getElementById('settings-title').value.trim() || State.project.title;
     document.getElementById('project-name-display').textContent = State.project.title;
 
+    // CSS Mode
+    const cssModeEl = document.getElementById('settings-css-mode');
+    if (cssModeEl) {
+      State.project.cssMode = cssModeEl.value || 'tailwind-cdn';
+    }
+
     UI.closeModal('modal-settings');
     await ProjectManager.saveProjectMeta();
+
+    // Refresh ThemeEditor notice if it's currently open
+    if (State.activeView === 'theme-editor' && typeof ThemeEditor !== 'undefined') {
+      ThemeEditor._renderCssModeNotice();
+    }
+
     Utils.showToast('Settings saved.', 'info');
   },
 

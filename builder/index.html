@@ -392,7 +392,9 @@
       </div>
       <div class="theme-editor-layout">
         <!-- Left: controls -->
-        <div class="theme-editor-controls">
+        <div class="theme-editor-controls" id="theme-editor-controls">
+          <!-- CSS mode notice (injected by ThemeEditor._renderCssModeNotice) -->
+          <div id="theme-editor-css-notice"></div>
           <!-- Live preview bar -->
           <div id="te-preview-bar" class="theme-preview-bar" style="margin-bottom:20px">
             <div class="theme-preview-swatch" id="te-swatch-surface" title="Surface"></div>
@@ -942,6 +944,16 @@
       </div>
       <div id="settings-lang-info" class="form-field">
         <p style="font-size:12px;color:#555"></p>
+      </div>
+      <div style="border-top:1px solid #111118;margin:16px 0 12px"></div>
+      <div class="form-field">
+        <label>CSS Mode</label>
+        <select id="settings-css-mode">
+          <option value="tailwind-cdn">Tailwind CDN (default — config injected at runtime)</option>
+          <option value="tailwind-local">Tailwind Local (pre-compiled CSS, no CDN)</option>
+          <option value="custom">Custom CSS (no Tailwind, edit stylesheets directly)</option>
+        </select>
+        <small id="settings-css-mode-hint" style="color:#555;line-height:1.5;margin-top:4px;display:block"></small>
       </div>
       <div style="border-top:1px solid #111118;margin:16px 0 12px"></div>
       <div class="form-field">
