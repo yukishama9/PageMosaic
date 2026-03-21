@@ -141,19 +141,6 @@ Outputs land in `out/make/`.
 
 ---
 
-## Automated releases via GitHub Actions
-
-Push a version tag to trigger a full three-platform build and create a GitHub Release automatically:
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-The workflow (`.github/workflows/release.yml`) builds on `windows-latest`, `macos-latest`, and `ubuntu-latest`, then attaches all installers to the release.
-
----
-
 ## CSS modes
 
 PageMosaic supports three CSS modes, configurable per project in **Project Settings**:
