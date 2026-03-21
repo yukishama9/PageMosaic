@@ -1,26 +1,62 @@
-# WebBuilder
+# PageMosaic
 
-> Visual HTML site editor with reusable component sync and multi-language support.
+> Visual static-site editor — edit reusable components once, sync across every page, manage multi-language content.
 
-WebBuilder is a lightweight desktop tool for managing static HTML websites. It lets you edit reusable components (navbar, footer, cookie banner, etc.) once and sync changes across every page — with built-in multi-language (i18n) support and a live preview.
+PageMosaic is a lightweight desktop tool for building and maintaining static HTML websites. It gives you a visual workspace where you can manage **reusable components** (navbar, footer, cookie banner, etc.), **multi-language translations**, and **page content** — all in one place, with a live preview.
 
----
-
-## Features
-
-- **Component sync** — edit a navbar or footer once; all pages update automatically
-- **Multi-language** — manage translations per page with the built-in i18n editor
-- **Live preview** — desktop / tablet / mobile viewport switching
-- **Import existing sites** — drop in any HTML folder; components are auto-detected
-- **Export** — generates one output folder per language in your chosen releases directory
-- **Works in-browser or as a desktop app** — run directly from `builder/index.html` in any modern browser, or install the Electron desktop build
+No framework. No build step. Pure HTML files you own completely.
 
 ---
 
-## Project Structure
+## What PageMosaic can do
+
+### 🧩 Component-based editing
+Define reusable blocks (navbar, footer, cookie consent, etc.) as **components**. Edit a component once — PageMosaic rewrites every page that uses it automatically.
+
+Pages reference components with a simple HTML comment:
+```html
+<!-- @component:navbar -->
+<main>…</main>
+<!-- @component:footer -->
+<!-- @component:cookie-banner -->
+```
+
+### 🌍 Multi-language support (i18n)
+- Manage translation keys in a spreadsheet-style editor
+- Missing translations are highlighted in orange
+- At export time, each language gets its own output folder with all strings resolved
+
+### 🎨 Theme editor
+- Visual color palette, typography, and border-radius controls
+- **Tailwind CDN mode**: theme config injected at runtime — changes are instant with no compilation step
+- **Tailwind Local mode**: theme saved to `tailwind.config.js`; auto-compiles `assets/css/tailwind.css` via the Tailwind CLI (Electron only)
+- **Custom CSS mode**: Theme Editor disabled; manage your own stylesheets directly
+
+### 📦 Shared data
+Menus, social links, language switchers — define them once and reuse them across any component with template loops:
+```html
+<!-- @each:main-menu -->
+<a href="{{item.href}}">{{t:item.i18nKey}}</a>
+<!-- @/each -->
+```
+
+### 🖼 Live preview
+- Desktop / Tablet / Mobile viewport switcher
+- Per-language preview
+- Instant hot-reload as you type in the code editor
+
+### 📥 Import existing sites
+Drop any existing HTML folder into PageMosaic. It auto-detects `<header>`, `<footer>`, and cookie-banner elements and converts them into editable components. No manual setup required.
+
+### 📤 Export
+Generates a clean output folder per language under your chosen `releases/` directory. Page metadata (title, description, OG tags, canonical) is injected automatically. Custom `<head>` code (analytics, favicons, hreflang) is appended to every page.
+
+---
+
+## Project structure
 
 ```
-webbuilder/
+pagemosaic/
 ├── builder/            # App source — HTML, CSS, JS (no build step required)
 │   ├── index.html
 │   ├── css/
@@ -29,11 +65,11 @@ webbuilder/
 │       ├── wb-core.js       # State, Utils, FileHandler
 │       ├── wb-project.js    # Project management (CRUD, import, export)
 │       ├── wb-ui.js         # Sidebar, tabs, modals
-│       ├── wb-editors.js    # Page, Component, SharedData, i18n editors
-│       ├── wb-preview.js    # Live iframe preview
+│       ├── wb-editors.js    # Page, Component, SharedData, i18n, Theme editors
+│       ├── wb-preview.js    # Live iframe preview & ThemeEngine
 │       └── wb-app.js        # Entry point & action handlers
 ├── electron/           # Electron main process (desktop builds only)
-│   ├── main.js         # BrowserWindow + IPC file-system handlers
+│   ├── main.js         # BrowserWindow + IPC file-system & Tailwind compile handlers
 │   └── preload.js      # contextBridge — exposes electronAPI to renderer
 ├── resources/          # Reusable CSS snippets and script templates
 ├── .github/
@@ -41,6 +77,7 @@ webbuilder/
 │       └── release.yml # CI/CD — builds installers on every version tag push
 ├── forge.config.js     # Electron Forge packaging config (Win / macOS / Linux)
 ├── package.json
+├── start.bat           # Quick-start via Python HTTP server (browser mode)
 ├── LICENSE             # MIT
 └── README.md
 ```
@@ -54,16 +91,18 @@ webbuilder/
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/webbuilder.git
-cd webbuilder
+git clone https://github.com/yukishama9/pagemosaic.git
+cd pagemosaic
 
-# Open directly in your browser
-open builder/index.html       # macOS
-start builder/index.html      # Windows
-xdg-open builder/index.html   # Linux
+# Windows: double-click start.bat, or run:
+start.bat
+
+# macOS / Linux:
+python3 -m http.server 8765
+# then open http://localhost:8765/builder/ in your browser
 ```
 
-On first launch, click **Select…** next to **Projects folder** and **Releases folder** to configure where your work is stored. This is remembered across sessions.
+On first launch, click **Set** next to **Projects folder** and **Releases folder** to configure where your work is stored. This is remembered across sessions.
 
 ---
 
@@ -82,7 +121,7 @@ npm start
 
 ---
 
-## Building Installers
+## Building installers
 
 Requires [Node.js 20+](https://nodejs.org/) and [npm](https://npmjs.com).
 
@@ -102,7 +141,7 @@ Outputs land in `out/make/`.
 
 ---
 
-## Automated Releases via GitHub Actions
+## Automated releases via GitHub Actions
 
 Push a version tag to trigger a full three-platform build and create a GitHub Release automatically:
 
@@ -115,31 +154,15 @@ The workflow (`.github/workflows/release.yml`) builds on `windows-latest`, `maco
 
 ---
 
-## How Components Work
+## CSS modes
 
-Pages reference components with a comment marker:
+PageMosaic supports three CSS modes, configurable per project in **Project Settings**:
 
-```html
-<!-- @component:navbar -->
-<main>…</main>
-<!-- @component:footer -->
-```
-
-When you edit the `navbar` component and save, WebBuilder rewrites every page that uses it. Components can reference **shared data** (menus, social links) and **i18n keys** for multilingual content.
-
----
-
-## Multi-language Support
-
-Each language gets its own `i18n/{code}.json` translation file. The i18n editor shows all keys in a table with one column per language, highlighting missing translations in orange.
-
-At export time, WebBuilder generates one subfolder per language with all i18n keys resolved.
-
----
-
-## Contributing
-
-Pull requests are welcome. Please open an issue first to discuss major changes.
+| Mode | Description |
+|------|-------------|
+| **Tailwind CDN** | Tailwind loaded from CDN. Theme config is injected as a `<script>` block at runtime. Zero setup. |
+| **Tailwind Local** | Uses a locally compiled `assets/css/tailwind.css`. In Electron mode, saving the Theme Editor auto-runs `npx tailwindcss` to recompile. |
+| **Custom CSS** | No Tailwind. Theme Editor is disabled. Manage your own stylesheets directly — any CSS framework or hand-written CSS. |
 
 ---
 
