@@ -20,7 +20,6 @@ title: Blog — PageMosaic
       --fg2:      #a8a5a0;
       --accent:   #6366f1;
       --border:   #2a2a36;
-      --codebg:   #0a0a14;
     }
 
     html { scroll-behavior: smooth; }
@@ -145,6 +144,9 @@ title: Blog — PageMosaic
       line-height: 1.65;
     }
 
+    /* ── Hidden posts ── */
+    .post-item.hidden { display: none; }
+
     /* ── Empty state ── */
     .blog-empty {
       text-align: center;
@@ -176,7 +178,9 @@ title: Blog — PageMosaic
       color: var(--fg2);
       text-decoration: none;
       font-size: .875rem;
+      cursor: pointer;
       transition: all .2s;
+      user-select: none;
     }
     .page-btn:hover { border-color: var(--accent); color: var(--accent); }
     .page-btn.active {
@@ -222,7 +226,7 @@ title: Blog — PageMosaic
     </a>
     <div class="nav-links">
       <a href="/PageMosaic/#features">Features</a>
-      <a href="/PageMosaic/#get-started">Get Started</a>
+      <a href="/PageMosaic/getting-started/">Getting Started</a>
       <a href="/PageMosaic/blog/" class="active">Blog</a>
       <a href="{{ site.repository }}" class="nav-gh">View on GitHub</a>
     </div>
@@ -237,11 +241,11 @@ title: Blog — PageMosaic
 </header>
 
 <div class="blog-main">
-  {% if paginator.posts.size > 0 %}
-  <ul class="post-list">
-    {% for post in paginator.posts %}
-    <li>
-      <a href="{{ post.url | relative_url }}" class="post-card">
+  {% if site.posts.size > 0 %}
+  <ul class="post-list" id="post-list">
+    {% for post in site.posts %}
+    <li class="post-item" data-index="{{ forloop.index0 }}">
+      <a href="{{ post.url | prepend: site.baseurl }}" class="post-card">
         <div class="post-card-meta">
           <span class="post-card-date">{{ post.date | date: "%B %-d, %Y" }}</span>
           {% if post.categories %}
@@ -261,32 +265,7 @@ title: Blog — PageMosaic
     {% endfor %}
   </ul>
 
-  <!-- Pagination -->
-  {% if paginator.total_pages > 1 %}
-  <nav class="pagination" aria-label="Blog pagination">
-    {% if paginator.previous_page %}
-      <a href="{{ paginator.previous_page_path | relative_url }}" class="page-btn">← Prev</a>
-    {% else %}
-      <span class="page-btn disabled">← Prev</span>
-    {% endif %}
-
-    {% for i in (1..paginator.total_pages) %}
-      {% if i == paginator.page %}
-        <span class="page-btn active">{{ i }}</span>
-      {% elsif i == 1 %}
-        <a href="/PageMosaic/blog/" class="page-btn">{{ i }}</a>
-      {% else %}
-        <a href="{{ site.paginate_path | replace: ':num', i | relative_url }}" class="page-btn">{{ i }}</a>
-      {% endif %}
-    {% endfor %}
-
-    {% if paginator.next_page %}
-      <a href="{{ paginator.next_page_path | relative_url }}" class="page-btn">Next →</a>
-    {% else %}
-      <span class="page-btn disabled">Next →</span>
-    {% endif %}
-  </nav>
-  {% endif %}
+  <nav class="pagination" id="pagination" aria-label="Blog pagination"></nav>
 
   {% else %}
   <div class="blog-empty">
@@ -305,6 +284,60 @@ title: Blog — PageMosaic
     &mdash; Created by {{ site.author }}
   </p>
 </footer>
+
+<script>
+(function () {
+  const PER_PAGE = 6;
+  const items = Array.from(document.querySelectorAll('.post-item'));
+  const total = items.length;
+  const totalPages = Math.ceil(total / PER_PAGE);
+  let currentPage = 1;
+
+  if (totalPages <= 1) return; // no pagination needed
+
+  function showPage(page) {
+    currentPage = page;
+    items.forEach((item, i) => {
+      const inPage = i >= (page - 1) * PER_PAGE && i < page * PER_PAGE;
+      item.classList.toggle('hidden', !inPage);
+    });
+    renderPagination();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function renderPagination() {
+    const nav = document.getElementById('pagination');
+    nav.innerHTML = '';
+
+    // Prev
+    const prev = document.createElement('span');
+    prev.className = 'page-btn' + (currentPage === 1 ? ' disabled' : '');
+    prev.textContent = '← Prev';
+    if (currentPage > 1) prev.addEventListener('click', () => showPage(currentPage - 1));
+    nav.appendChild(prev);
+
+    // Page numbers
+    for (let i = 1; i <= totalPages; i++) {
+      const btn = document.createElement('span');
+      btn.className = 'page-btn' + (i === currentPage ? ' active' : '');
+      btn.textContent = i;
+      const page = i;
+      btn.addEventListener('click', () => showPage(page));
+      nav.appendChild(btn);
+    }
+
+    // Next
+    const next = document.createElement('span');
+    next.className = 'page-btn' + (currentPage === totalPages ? ' disabled' : '');
+    next.textContent = 'Next →';
+    if (currentPage < totalPages) next.addEventListener('click', () => showPage(currentPage + 1));
+    nav.appendChild(next);
+  }
+
+  // Init: show first page
+  showPage(1);
+})();
+</script>
 
 </body>
 </html>

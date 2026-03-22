@@ -12,12 +12,6 @@ kramdown:
   input: GFM
   hard_wrap: false
 
-# Pagination (jekyll-paginate — GitHub Pages native)
-paginate: 6
-paginate_path: "/PageMosaic/blog/page:num/"
-plugins:
-  - jekyll-paginate
-
 # No theme — using custom _layouts/
 
 # Timezone
