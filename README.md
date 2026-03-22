@@ -17,6 +17,8 @@ PageMosaic is a lightweight desktop tool for building and maintaining static HTM
 📥 **Import existing sites** — Auto-detects headers, footers, and cookie banners from any HTML folder.  
 📤 **Export** — Clean per-language output with metadata, OG tags, and custom head code injected automatically.
 
+![PageMosaic UI](https://raw.githubusercontent.com/yukishama9/PageMosaic/main/docs/assets/img/screenshot-01.png)
+
 ---
 
 ### ☕ Support this project
@@ -57,6 +59,8 @@ npm install
 npm start          # run normally
 npm run dev        # run with DevTools
 ```
+
+📖 **[Full Getting Started Guide](https://yukishama9.github.io/PageMosaic/getting-started/)** — step-by-step walkthrough with screenshots
 
 ---
 

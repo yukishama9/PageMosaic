@@ -101,6 +101,15 @@
       line-height: 1.8;
     }
     .hero-btns { display: flex; gap: .875rem; justify-content: center; flex-wrap: wrap; }
+    .hero-screenshot {
+      margin: 3rem auto 0;
+      max-width: 900px;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: 0 24px 64px rgba(0,0,0,.5);
+    }
+    .hero-screenshot img { display: block; width: 100%; height: auto; }
     .btn {
       padding: .7rem 1.4rem;
       border-radius: 6px;
@@ -267,7 +276,7 @@
     </a>
     <div class="nav-links">
       <a href="#features">Features</a>
-      <a href="#get-started">Get Started</a>
+      <a href="/PageMosaic/getting-started/">Getting Started</a>
       <a href="/PageMosaic/blog/">Blog</a>
       <a href="{{ site.repository }}" class="nav-gh">View on GitHub</a>
     </div>
@@ -281,6 +290,9 @@
   <div class="hero-btns">
     <a href="{{ site.repository }}" class="btn btn-primary">View on GitHub</a>
     <a href="#get-started" class="btn btn-outline">Get Started</a>
+  </div>
+  <div class="hero-screenshot">
+    <img src="/PageMosaic/assets/img/screenshot-01.png" alt="PageMosaic — main interface">
   </div>
 </section>
 
