@@ -1,5 +1,5 @@
 // Electron Forge configuration
-// Builds installers for Windows (.exe), macOS (.dmg), and Linux (.deb / .AppImage)
+// Builds installers for Windows (.exe), macOS (.dmg), and Linux (.deb / .rpm)
 const { FusesPlugin } = require('@electron-forge/plugin-fuses');
 const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 
@@ -13,59 +13,58 @@ module.exports = {
       /^\/\.git/,
       /^\/\.github/,
       /^\/node_modules\/.cache/,
-      // Exclude user data directories from the bundle
-      // (users point to their own projects/releases folders)
       /^\/projects/,
       /^\/releases/,
     ],
     appBundleId: 'com.pagemosaic.app',
     appCategoryType: 'public.app-category.developer-tools',
-    // macOS code signing (set env vars CI_SIGNING_IDENTITY etc. in CI)
-    // osxSign: {},
-    // osxNotarize: { tool: 'notarytool', ... },
   },
 
   rebuildConfig: {},
 
   makers: [
-    // Windows: Squirrel installer (.exe)
+    // Windows: Squirrel installer (.exe) — Windows only
     {
       name: '@electron-forge/maker-squirrel',
+      platforms: ['win32'],
       config: {
         name: 'PageMosaic',
       },
     },
-    // macOS: DMG disk image
+    // macOS: DMG disk image — macOS only
     {
       name: '@electron-forge/maker-dmg',
+      platforms: ['darwin'],
       config: {
         name: 'PageMosaic',
         format: 'ULFO',
       },
     },
-    // Linux: .deb package
+    // Linux: .deb package — Linux only
     {
       name: '@electron-forge/maker-deb',
+      platforms: ['linux'],
       config: {
         options: {
           maintainer: 'PageMosaic',
-          homepage: 'https://github.com/yukishima9/webbuilder',
+          homepage: 'https://github.com/yukishama9/PageMosaic',
         },
       },
     },
-    // Linux: RPM package
+    // Linux: RPM package — Linux only
     {
       name: '@electron-forge/maker-rpm',
+      platforms: ['linux'],
       config: {
         options: {
-          homepage: 'https://github.com/yukishima9/webbuilder',
+          homepage: 'https://github.com/yukishama9/PageMosaic',
         },
       },
     },
-    // Cross-platform: plain .zip (useful for direct downloads)
+    // Cross-platform: plain .zip for all platforms
     {
       name: '@electron-forge/maker-zip',
-      platforms: ['darwin', 'linux'],
+      platforms: ['win32', 'darwin', 'linux'],
     },
   ],
 
