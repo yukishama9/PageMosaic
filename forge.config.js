@@ -6,7 +6,9 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
   packagerConfig: {
     asar: true,
-    // Files to include in the packaged app
+    name: 'PageMosaic',
+    executableName: 'pagemosaic',
+    // Files to exclude from the packaged app
     ignore: [
       /^\/\.git/,
       /^\/\.github/,
@@ -16,7 +18,7 @@ module.exports = {
       /^\/projects/,
       /^\/releases/,
     ],
-    appBundleId: 'com.webbuilder.app',
+    appBundleId: 'com.pagemosaic.app',
     appCategoryType: 'public.app-category.developer-tools',
     // macOS code signing (set env vars CI_SIGNING_IDENTITY etc. in CI)
     // osxSign: {},
@@ -30,16 +32,14 @@ module.exports = {
     {
       name: '@electron-forge/maker-squirrel',
       config: {
-        name: 'WebBuilder',
-        setupIcon: 'assets/icon.ico',
+        name: 'PageMosaic',
       },
     },
     // macOS: DMG disk image
     {
       name: '@electron-forge/maker-dmg',
       config: {
-        name: 'WebBuilder',
-        icon: 'assets/icon.icns',
+        name: 'PageMosaic',
         format: 'ULFO',
       },
     },
@@ -48,9 +48,8 @@ module.exports = {
       name: '@electron-forge/maker-deb',
       config: {
         options: {
-          maintainer: 'WebBuilder',
-          homepage: 'https://github.com/your-username/webbuilder',
-          icon: 'assets/icon.png',
+          maintainer: 'PageMosaic',
+          homepage: 'https://github.com/yukishima9/webbuilder',
         },
       },
     },
@@ -59,8 +58,7 @@ module.exports = {
       name: '@electron-forge/maker-rpm',
       config: {
         options: {
-          homepage: 'https://github.com/your-username/webbuilder',
-          icon: 'assets/icon.png',
+          homepage: 'https://github.com/yukishima9/webbuilder',
         },
       },
     },
