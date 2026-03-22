@@ -7,6 +7,8 @@ PageMosaic is a lightweight desktop tool for building and maintaining static HTM
 No framework. No build step. Pure HTML files you own completely.
 
 ---
+### ☕ Support this project
+[![Support my work](https://img.shields.io/badge/Support-Buy%20me%20a%20coffee-orange?style=for-the-badge)](https://yukishama9.github.io/Helios-Blog/)
 
 ## What PageMosaic can do
 
