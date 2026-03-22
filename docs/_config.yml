@@ -3,7 +3,8 @@ title: PageMosaic
 description: Visual static-site editor — edit reusable components once, sync across every page, manage multi-language content
 author: Helios Shen
 repository: https://github.com/yukishama9/PageMosaic
-url: https://yukishama9.github.io/PageMosaic
+url: https://yukishama9.github.io
+baseurl: /PageMosaic
 
 # GitHub Pages settings
 markdown: kramdown
@@ -13,7 +14,7 @@ kramdown:
 
 # Pagination (jekyll-paginate — GitHub Pages native)
 paginate: 6
-paginate_path: "/blog/page:num/"
+paginate_path: "/PageMosaic/blog/page:num/"
 plugins:
   - jekyll-paginate
 

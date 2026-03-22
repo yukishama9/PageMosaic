@@ -1,5 +1,7 @@
 # PageMosaic
 
+![PageMosaic](https://raw.githubusercontent.com/yukishama9/PageMosaic/main/builder/img/banner.svg)
+
 > Visual static-site editor — edit reusable components once, sync across every page, manage multi-language content.
 
 PageMosaic is a lightweight desktop tool for building and maintaining static HTML websites. No framework. No build step. Pure HTML files you own completely.
