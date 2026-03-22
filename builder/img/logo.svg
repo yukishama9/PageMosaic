@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- 定义渐变色 -->
+    <linearGradient id="gradBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="gradBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+    <linearGradient id="gradPurple" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#6d28d9"/>
+    </linearGradient>
+    <linearGradient id="gradCyan" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#06b6d4"/>
+      <stop offset="100%" stop-color="#0891b2"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 背景 -->
+  <rect width="512" height="512" rx="112" fill="url(#gradBg)"/>
+
+  <!-- 马赛克拼图块��代表 Web 页面布局 -->
+  <!-- 左侧边栏 -->
+  <rect x="100" y="100" width="100" height="312" rx="24" fill="url(#gradBlue)"/>
+  <!-- 右上头部 -->
+  <rect x="220" y="100" width="192" height="100" rx="24" fill="url(#gradPurple)"/>
+  <!-- 右下主内容区 -->
+  <rect x="220" y="220" width="192" height="192" rx="24" fill="url(#gradCyan)"/>
+
+  <!-- HTML 代码符号 < / > 融入主内容区 -->
+  <path d="M 280 286 L 250 316 L 280 346" fill="none" stroke="#ffffff" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+  <path d="M 330 280 L 300 352" fill="none" stroke="#ffffff" stroke-width="20" stroke-linecap="round" opacity="0.9"/>
+  <path d="M 350 286 L 380 316 L 350 346" fill="none" stroke="#ffffff" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+</svg>

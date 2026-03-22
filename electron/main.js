@@ -19,7 +19,7 @@ function createWindow() {
     minHeight: 600,
     title: 'PageMosaic',
     // Use a custom icon when one is available
-    // icon: path.join(__dirname, '../assets/icon.png'),
+    icon: path.join(__dirname, '../resources/icon.png'),
     webPreferences: {
       // Preload script exposes safe IPC APIs to the renderer
       preload: path.join(__dirname, 'preload.js'),

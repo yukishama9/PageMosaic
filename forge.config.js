@@ -8,6 +8,7 @@ module.exports = {
     asar: true,
     name: 'PageMosaic',
     executableName: 'pagemosaic',
+    icon: path.join(__dirname, 'resources/icon'),
     // Files to exclude from the packaged app
     ignore: [
       /^\/\.git/,
