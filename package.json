@@ -4,7 +4,7 @@
   "description": "Visual static-site editor — edit reusable components once, sync across every page, manage multi-language content",
   "main": "electron/main.js",
   "homepage": "https://github.com/yukishama9/pagemosaic",
-  "author": "PageMosaic",
+  "author": "Helios Shen (yukishama9)",
   "license": "MIT",
   "private": false,
   "scripts": {
