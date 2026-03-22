@@ -151,25 +151,49 @@ const Preview = {
   }, 500),
 
   // ── Process page HTML: inject components, resolve templates, apply theme ──────
-  _processPageHtml(html, filename, lang) {
+  // exportCtx (optional): { exportLang, baseLang } — set only during Exporter.run()
+  _processPageHtml(html, filename, lang, exportCtx) {
     let processed = html;
 
     // Inject component markup in place of <!-- @component:id --> markers
-    processed = this._injectComponents(processed, filename, lang);
+    processed = this._injectComponents(processed, filename, lang, exportCtx);
 
     // Resolve template tokens
     processed = this._resolveTokens(processed, filename, lang);
 
-    // Apply project theme based on cssMode — preview mode
+    // Apply i18n overlay: for imported HTML that has no {{t:...}} tokens,
+    // perform DOM-level text replacement using the i18n database.
+    // Runs in both preview and export mode — Exporter also needs translated text
+    // for non-base languages, for which no pre-translated source files exist.
+    processed = this._applyI18nOverlay(processed, lang);
+
+    // Apply project theme based on cssMode
     const cssMode = State.project?.cssMode || 'tailwind-cdn';
     const theme = State.project?.theme;
-    if (theme && cssMode === 'tailwind-cdn') {
-      processed = ThemeEngine.injectConfig(processed, theme);
-      processed = ThemeEngine.injectFontsLink(processed, theme);
-    } else if (theme && cssMode === 'tailwind-local') {
-      processed = ThemeEngine.injectFontsLink(processed, theme);
+    if (!exportCtx) {
+      // ── Preview mode: always use CDN so theme edits work in real-time ──────
+      // For 'tailwind-local' projects, swap the pre-compiled CSS link for the
+      // Tailwind CDN script so the injected config is processed by the runtime.
+      if (theme && cssMode === 'tailwind-local') {
+        processed = ThemeEngine.swapLocalCssForCdn(processed);
+        processed = ThemeEngine.injectConfig(processed, theme);
+        processed = ThemeEngine.injectFontsLink(processed, theme);
+      } else if (theme && cssMode === 'tailwind-cdn') {
+        processed = ThemeEngine.injectConfig(processed, theme);
+        processed = ThemeEngine.injectFontsLink(processed, theme);
+      }
+      // cssMode === 'custom': no ThemeEngine injection
+    } else {
+      // ── Export mode: respect the project's cssMode ────────────────────────
+      if (theme && cssMode === 'tailwind-cdn') {
+        processed = ThemeEngine.injectConfig(processed, theme);
+        processed = ThemeEngine.injectFontsLink(processed, theme);
+      } else if (theme && cssMode === 'tailwind-local') {
+        // Keep the pre-compiled CSS; only update the Google Fonts link
+        processed = ThemeEngine.injectFontsLink(processed, theme);
+      }
+      // cssMode === 'custom': no ThemeEngine injection
     }
-    // cssMode === 'custom': no ThemeEngine injection
 
     return processed;
   },
@@ -178,7 +202,7 @@ const Preview = {
   // Strategy 1: replace full marker blocks <!-- @component:id -->...<!-- /@component:id -->
   // Strategy 2: replace any remaining bare opening markers <!-- @component:id -->
   // This prevents double-injection when the source HTML already contains filled marker blocks.
-  _injectComponents(html, filename, lang) {
+  _injectComponents(html, filename, lang, exportCtx) {
     // Track which IDs were already handled in Step 1 (full block replacement).
     // Step 2 must skip these to avoid re-matching the markers we just wrote.
     const processedIds = new Set();
@@ -190,7 +214,7 @@ const Preview = {
         processedIds.add(id);
         const comp = State.components[id];
         if (!comp) return `<!-- component "${id}" not found -->`;
-        const compHtml = this._processComponentHtml(comp.html, lang, filename);
+        const compHtml = this._processComponentHtml(comp.html, lang, filename, exportCtx);
         return `<!-- @component:${id} -->\n${compHtml}\n<!-- /@component:${id} -->`;
       }
     );
@@ -202,7 +226,7 @@ const Preview = {
       if (processedIds.has(id)) return match; // already replaced — leave the marker as-is
       const comp = State.components[id];
       if (!comp) return `<!-- component "${id}" not found -->`;
-      const compHtml = this._processComponentHtml(comp.html, lang, filename);
+      const compHtml = this._processComponentHtml(comp.html, lang, filename, exportCtx);
       return `<!-- @component:${id} -->\n${compHtml}\n<!-- /@component:${id} -->`;
     });
 
@@ -210,12 +234,13 @@ const Preview = {
   },
 
   // ── Process a single component's HTML ────────────────────────────────────────
-  _processComponentHtml(html, lang, pageName) {
+  // exportCtx (optional): { exportLang, baseLang } — set only during Exporter.run()
+  _processComponentHtml(html, lang, pageName, exportCtx) {
     if (!html) return '';
     let processed = html;
 
     // Process @each loops
-    processed = this._processEachLoops(processed, lang);
+    processed = this._processEachLoops(processed, lang, pageName, exportCtx);
 
     // Resolve tokens
     processed = this._resolveTokens(processed, pageName || '', lang);
@@ -224,7 +249,8 @@ const Preview = {
   },
 
   // ── Process @each:id loops ────────────────────────────────────────────────────
-  _processEachLoops(html, lang) {
+  // exportCtx (optional): { exportLang, baseLang } — enables dynamic lang-switcher path calc
+  _processEachLoops(html, lang, pageName, exportCtx) {
     return html.replace(
       /<!--\s*@each:([\w-]+)\s*-->([\s\S]*?)<!--\s*@\/each\s*-->/g,
       (match, dataId, template) => {
@@ -234,14 +260,26 @@ const Preview = {
         return data.items.map(item => {
           let row = template;
 
+          // For 'languages' shared data during export: compute correct relative path prefix
+          // so the language switcher always links to the correct language version of the
+          // current page, regardless of which language subdirectory we are exporting to.
+          let resolvedItem = item;
+          if (dataId === 'languages' && exportCtx && pageName) {
+            resolvedItem = Object.assign({}, item, {
+              pathPrefix: this._computeLangSwitcherPrefix(
+                item.code, exportCtx.exportLang, exportCtx.baseLang
+              ),
+            });
+          }
+
           // Replace {{item.field}} tokens
           row = row.replace(/\{\{item\.([\w.]+)\}\}/g, (m, fieldKey) => {
-            return Utils.escapeHtml(item[fieldKey] || '');
+            return Utils.escapeHtml(resolvedItem[fieldKey] || '');
           });
 
           // Replace {{t:item.i18nKey}} — look up item's i18n key
           row = row.replace(/\{\{t:item\.([\w.]+)\}\}/g, (m, fieldKey) => {
-            const i18nKey = item[fieldKey];
+            const i18nKey = resolvedItem[fieldKey];
             if (!i18nKey) return '';
             return this._resolveI18n(i18nKey, lang);
           });
@@ -276,6 +314,173 @@ const Preview = {
     result = result.replace(/\{\{lang\}\}/g, lang || '');
 
     return result;
+  },
+
+  // ── Compute relative path prefix for the language switcher ───────────────────
+  // Returns the prefix that, when prepended to a page filename, gives the correct
+  // relative link from a page in `currentLang` to the same page in `targetLang`.
+  //
+  // Examples (baseLang = 'en'):
+  //   currentLang='en',    targetLang='zh-SC' → 'zh-SC/'
+  //   currentLang='zh-SC', targetLang='en'    → '../'
+  //   currentLang='zh-SC', targetLang='zh-SC' → ''
+  //   currentLang='zh-SC', targetLang='zh-TC' → '../zh-TC/'
+  _computeLangSwitcherPrefix(targetLang, currentLang, baseLang) {
+    const targetIsBase = targetLang === baseLang;
+    const currentIsBase = currentLang === baseLang;
+    if (currentIsBase) {
+      if (targetIsBase) return ''; // same lang, at root
+      return `${targetLang}/`; // at root → into lang subdir
+    } else {
+      // current page is in a lang subdirectory
+      if (targetIsBase) return '../'; // go up to root (base lang)
+      if (targetLang === currentLang) return ''; // same subdir
+      return `../${targetLang}/`; // up to root then into sibling lang dir
+    }
+  },
+
+  // ── Set <html lang="…"> attribute ────────────────────────────────────────────
+  // Replaces or inserts the lang attribute on the <html> opening tag.
+  _injectLangAttribute(html, lang) {
+    return html.replace(/<html([^>]*?)>/i, (match, attrs) => {
+      const cleanAttrs = attrs
+        .replace(/\s+lang="[^"]*"/gi, '')
+        .replace(/\s+lang='[^']*'/gi, '');
+      return `<html lang="${Utils.escapeHtml(lang)}"${cleanAttrs}>`;
+    });
+  },
+
+  // ── Inject hreflang <link> tags for all language versions ────────────────────
+  // Inserts <link rel="alternate" hreflang="xx" href="…"> for every language,
+  // plus an x-default pointing to the base language.
+  // Uses relative paths when canonicalBase is not provided.
+  // Only injects when there are 2 or more languages (hreflang is pointless with one).
+  _injectHreflang(html, pageName, currentLang, allLangs, baseLang, canonicalBase) {
+    if (!allLangs || allLangs.length < 2) return html;
+
+    const lines = allLangs.map(lang => {
+      let href;
+      if (canonicalBase) {
+        const cleanBase = canonicalBase.replace(/\/$/, '');
+        href = lang.code === baseLang
+          ? `${cleanBase}/${pageName}`
+          : `${cleanBase}/${lang.code}/${pageName}`;
+      } else {
+        const prefix = this._computeLangSwitcherPrefix(lang.code, currentLang, baseLang);
+        href = `${prefix}${pageName}`;
+      }
+      return `  <link rel="alternate" hreflang="${Utils.escapeHtml(lang.code)}" href="${href}">`;
+    });
+
+    // x-default → base language version
+    const xDefaultPrefix = canonicalBase
+      ? (canonicalBase.replace(/\/$/, '') + '/')
+      : this._computeLangSwitcherPrefix(baseLang, currentLang, baseLang);
+    const xDefaultHref = canonicalBase
+      ? `${canonicalBase.replace(/\/$/, '')}/${pageName}`
+      : `${xDefaultPrefix}${pageName}`;
+    lines.unshift(`  <link rel="alternate" hreflang="x-default" href="${xDefaultHref}">`);
+
+    // Remove any pre-existing hreflang tags to avoid duplicates
+    let result = html.replace(/<link\s[^>]*hreflang[^>]*>/gi, '').replace(/[ \t]*\n(?=\s*\n)/g, '\n');
+
+    const injection = lines.join('\n') + '\n';
+    if (/<\/head>/i.test(result)) {
+      return result.replace(/<\/head>/i, `${injection}</head>`);
+    }
+    return result;
+  },
+
+  // ── Apply i18n overlay: DOM-level text replacement for hardcoded HTML ─────────
+  // For imported HTML sites that don't use {{t:...}} template tokens, this method
+  // walks the rendered HTML (as a DOM) and replaces all text nodes + key attributes
+  // that match the base-language strings with their target-language translations.
+  //
+  // Rules:
+  //   • Only runs when target lang ≠ base lang
+  //   • Only replaces entries where targetData[key] is non-empty
+  //   • Replacements are sorted longest-first to avoid partial-match corruption
+  //   • Only touches: text nodes, alt, title, placeholder, aria-label attributes
+  //   • Skips script/style/pre/code element subtrees
+  _applyI18nOverlay(html, lang) {
+    if (!State.project || !lang) return html;
+    const baseLang = State.project.baseLanguage;
+    if (!baseLang || lang === baseLang) return html; // nothing to do for base lang
+
+    const baseData = State.i18nData[baseLang] || {};
+    const targetData = State.i18nData[lang] || {};
+
+    // Build replacement list: [{ from, to }], skipping empty translations
+    const replacements = [];
+    for (const [key, baseText] of Object.entries(baseData)) {
+      const t = targetData[key];
+      if (!baseText || typeof baseText !== 'string') continue;
+      if (!t || typeof t !== 'string' || !t.trim()) continue;
+      if (baseText === t) continue; // same text — skip
+      replacements.push({ from: baseText, to: t });
+    }
+
+    if (replacements.length === 0) return html;
+
+    // Sort longest first to avoid shorter strings corrupting longer ones
+    replacements.sort((a, b) => b.from.length - a.from.length);
+
+    // Parse the HTML and do DOM-level replacement
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+
+    const SKIP_TAGS = new Set(['script', 'style', 'pre', 'code', 'noscript', 'template', 'svg', 'math']);
+    const ATTR_TARGETS = ['alt', 'title', 'placeholder', 'aria-label'];
+
+    // Build a fast lookup map: from → to (normalised whitespace)
+    const lookupMap = new Map();
+    for (const { from, to } of replacements) {
+      // Store both exact and single-space-normalised variants
+      lookupMap.set(from, to);
+      const norm = from.replace(/\s+/g, ' ').trim();
+      if (norm !== from) lookupMap.set(norm, to);
+    }
+
+    const walk = (node) => {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const tag = node.tagName.toLowerCase();
+        if (SKIP_TAGS.has(tag)) return;
+
+        // Replace matching attribute values
+        for (const attr of ATTR_TARGETS) {
+          const val = node.getAttribute(attr);
+          if (!val) continue;
+          const norm = val.replace(/\s+/g, ' ').trim();
+          if (lookupMap.has(val))        node.setAttribute(attr, lookupMap.get(val));
+          else if (lookupMap.has(norm))  node.setAttribute(attr, lookupMap.get(norm));
+        }
+
+        for (const child of node.childNodes) walk(child);
+      } else if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent;
+        const norm = text.replace(/\s+/g, ' ').trim();
+        if (!norm) return;
+
+        let replacement = null;
+        if (lookupMap.has(text)) {
+          replacement = lookupMap.get(text);
+        } else if (lookupMap.has(norm)) {
+          // Preserve surrounding whitespace
+          const leading  = text.match(/^\s*/)[0];
+          const trailing = text.match(/\s*$/)[0];
+          replacement = leading + lookupMap.get(norm) + trailing;
+        }
+
+        if (replacement !== null) {
+          node.textContent = replacement;
+        }
+      }
+    };
+
+    walk(doc.documentElement);
+
+    // Serialise back to HTML string
+    return '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
   },
 
   // ── Resolve an i18n key ───────────────────────────────────────────────────────
@@ -415,15 +620,18 @@ const Preview = {
     processed = this._injectComponents(processed, filename, State.previewLanguage);
     processed = this._resolveTokens(processed, filename, State.previewLanguage);
 
-    // Apply temp theme based on cssMode (Theme Editor preview)
+    // Apply temp theme — always use CDN in preview so color edits work in real-time
     const cssMode = State.project?.cssMode || 'tailwind-cdn';
-    if (tempTheme && cssMode === 'tailwind-cdn') {
-      processed = ThemeEngine.injectConfig(processed, tempTheme);
-      processed = ThemeEngine.injectFontsLink(processed, tempTheme);
-    } else if (tempTheme && cssMode === 'tailwind-local') {
-      processed = ThemeEngine.injectFontsLink(processed, tempTheme);
+    if (tempTheme) {
+      if (cssMode === 'tailwind-local') {
+        // Swap pre-compiled CSS for CDN so the injected config is processed
+        processed = ThemeEngine.swapLocalCssForCdn(processed);
+      }
+      if (cssMode !== 'custom') {
+        processed = ThemeEngine.injectConfig(processed, tempTheme);
+        processed = ThemeEngine.injectFontsLink(processed, tempTheme);
+      }
     }
-    // cssMode === 'custom': no ThemeEngine injection
 
     await this._writeIframe(iframeId, processed);
   },
@@ -669,6 +877,28 @@ const ThemeEngine = {
     return `tailwind.config = ${JSON.stringify(cfg, null, 2)}`;
   },
 
+  // ── Swap local Tailwind CSS link for CDN script (preview-only) ───────────────
+  // Removes any <link> tag referencing a local tailwind.css file and injects the
+  // Tailwind CDN <script> tag so that injectConfig() can take effect in preview.
+  // Only used in preview mode — export mode keeps the local CSS as-is.
+  swapLocalCssForCdn(html) {
+    // Remove local tailwind CSS links (e.g. assets/css/tailwind.css)
+    let result = html.replace(
+      /<link[^>]*href=["'][^"']*tailwind[^"']*\.css["'][^>]*>/gi, ''
+    );
+
+    // If CDN script is already present, nothing more to do
+    if (/cdn\.tailwindcss\.com/i.test(result)) return result;
+
+    // Inject CDN script before </head>
+    const cdnTag = '<script src="https://cdn.tailwindcss.com"></script>';
+    if (/<\/head>/i.test(result)) {
+      return result.replace(/<\/head>/i, `${cdnTag}\n</head>`);
+    }
+    // Fallback: inject at start
+    return cdnTag + '\n' + result;
+  },
+
   // ── Inject / replace tailwind.config into an HTML string ─────────────────────
   // Replaces <script id="tailwind-config">…</script> if present.
   // If not present but <script src="…tailwindcss…"> exists, injects after it.
@@ -765,6 +995,10 @@ const Exporter = {
           langDir = await FileHandler.getDir(destHandle, lang, true);
         }
 
+        // Build export context: used by template engine to compute correct
+        // lang-switcher links relative to the current export language.
+        const exportCtx = { exportLang: lang, baseLang };
+
         for (const page of pages) {
           tick(`Exporting ${lang}/${page.file}…`);
 
@@ -772,8 +1006,17 @@ const Exporter = {
           const rawHtml = await ProjectManager.readPage(page.file);
           if (!rawHtml) continue;
 
-          // Process: inject components + resolve tokens for this lang
-          let exported = Preview._processPageHtml(rawHtml, page.file, lang);
+          // Process: inject components + resolve tokens for this lang.
+          // Pass exportCtx so the language switcher links are computed correctly.
+          let exported = Preview._processPageHtml(rawHtml, page.file, lang, exportCtx);
+
+          // Update <html lang="…"> to match the export language
+          exported = Preview._injectLangAttribute(exported, lang);
+
+          // Inject hreflang <link> tags for all language versions (SEO)
+          const allLangs = State.project.languages || [];
+          const canonicalBase = State.project?.canonicalBase || null;
+          exported = Preview._injectHreflang(exported, page.file, lang, allLangs, baseLang, canonicalBase);
 
           // Inject page metadata (title, description, OG tags, canonical)
           exported = this._injectPageMetadata(exported, page, lang);
@@ -792,7 +1035,7 @@ const Exporter = {
           // Inject custom head code (from Project Settings, all pages, export only)
           exported = this._injectHeadCode(exported);
 
-          // Fix asset paths for non-base languages (adjust relative paths up one level)
+          // Fix asset paths for non-base languages (prepend ../ to non-HTML assets)
           if (!isBase) {
             exported = this._fixRelativePaths(exported);
           }
@@ -897,16 +1140,21 @@ const Exporter = {
   },
 
   // ── Fix asset relative paths for language subdirectory pages ─────────────────
+  // Prepends ../ to asset paths (CSS, JS, images, fonts) but intentionally
+  // leaves .html page-to-page links intact — they are already correct relative
+  // to the language subdir because all pages share the same filename structure.
   _fixRelativePaths(html) {
-    // Prepend ../ to relative src/href paths (not http:// or // or #)
     return html
-      .replace(/(src|href)="(?!https?:\/\/|\/\/|#|data:)(.*?)"/g, (match, attr, path) => {
+      .replace(/(src|href)="(?!https?:\/\/|\/\/|#|data:|mailto:|tel:)(.*?)"/g, (match, attr, path) => {
+        if (!path) return match;
         if (path.startsWith('../') || path.startsWith('/')) return match;
+        // Keep .html inter-page links as-is — they resolve correctly within same lang dir
+        if (/\.html(\?|#|$)/.test(path)) return match;
         return `${attr}="../${path}"`;
       })
       .replace(/(url\()(?!['"]?https?:\/\/|['"]?\/\/|['"]?data:)(['"]?)(.*?)(['"]?)(\))/g,
         (match, pre, q1, path, q2, post) => {
-          if (path.startsWith('../') || path.startsWith('/')) return match;
+          if (!path || path.startsWith('../') || path.startsWith('/')) return match;
           return `${pre}${q1}../${path}${q2}${post}`;
         });
   },

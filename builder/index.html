@@ -584,7 +584,34 @@
       <div class="editor-toolbar">
         <span id="i18n-editor-title" class="toolbar-filename"></span>
         <span id="i18n-missing-count" style="font-size:11px;color:#f97316;margin-left:8px"></span>
+        <div style="flex:0 0 8px"></div>
+        <!-- i18n search box -->
+        <input id="i18n-search" type="text" placeholder="Search keys…"
+               oninput="I18nEditor.setFilter(this.value)"
+               style="width:130px;padding:3px 8px;background:#0d0d18;border:1px solid #2a2a36;border-radius:4px;color:#aaa;font-size:11px;outline:none">
+        <!-- Missing-only filter -->
+        <button id="i18n-filter-missing" class="toolbar-btn" onclick="I18nEditor.toggleMissingFilter()"
+                title="Show only missing translations" style="padding:3px 7px;font-size:10px">
+          <span class="material-symbols-outlined" style="font-size:13px;vertical-align:middle">filter_list</span>
+          Missing
+        </button>
         <div class="toolbar-spacer"></div>
+        <!-- Export CSV -->
+        <button class="toolbar-btn" onclick="I18nEditor.exportCsv()" title="Export all translations as CSV">
+          <span class="material-symbols-outlined" style="font-size:14px">download</span>
+          CSV
+        </button>
+        <!-- Import CSV / JSON -->
+        <button class="toolbar-btn" onclick="I18nEditor.triggerImport()" title="Import translations from CSV or JSON">
+          <span class="material-symbols-outlined" style="font-size:14px">upload</span>
+          Import
+        </button>
+        <input type="file" id="i18n-import-file" accept=".csv,.json" style="display:none"
+               onchange="I18nEditor.onImportFileChange(this)">
+        <button class="toolbar-btn" onclick="App.runTextScan()" title="Scan components & pages for untranslated text">
+          <span class="material-symbols-outlined" style="font-size:14px">document_scanner</span>
+          Scan
+        </button>
         <button class="toolbar-btn" onclick="I18nEditor.addKey()">
           <span class="material-symbols-outlined">add</span>
           <span>Add Key</span>
@@ -955,6 +982,11 @@
         </select>
         <small id="settings-css-mode-hint" style="color:#555;line-height:1.5;margin-top:4px;display:block"></small>
       </div>
+      <div class="form-field">
+        <label>Canonical Base URL</label>
+        <input id="settings-canonical-base" type="url" placeholder="https://example.com (optional)">
+        <small>Used for absolute <code style="color:#6366f1">hreflang</code> and canonical link tags in exported pages. Leave empty to use relative paths.</small>
+      </div>
       <div style="border-top:1px solid #111118;margin:16px 0 12px"></div>
       <div class="form-field">
         <label>Projects folder</label>
@@ -974,6 +1006,57 @@
     <div class="modal-footer">
       <button class="btn-secondary" onclick="UI.closeModal('modal-settings')">Cancel</button>
       <button class="btn-primary" onclick="App.saveSettings()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Text Scan Results -->
+<div id="modal-text-scan" class="modal-backdrop hidden">
+  <div class="modal" style="max-width:700px;width:95vw">
+    <div class="modal-header">
+      <span class="modal-title">
+        <span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;color:#6366f1">document_scanner</span>
+        Scan Results — Add to Base Language
+      </span>
+      <button class="modal-close" onclick="UI.closeModal('modal-text-scan')">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="modal-body" style="padding:12px 16px">
+      <p id="scan-summary" style="font-size:12px;color:#666;margin-bottom:10px"></p>
+      <!-- Filter bar -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <input id="scan-filter" type="text" placeholder="Filter results…"
+               oninput="App.filterScanResults(this.value)"
+               style="flex:1;padding:4px 8px;background:#0d0d18;border:1px solid #2a2a36;border-radius:4px;color:#aaa;font-size:11px;outline:none">
+        <label style="font-size:11px;color:#555;display:flex;align-items:center;gap:4px;cursor:pointer">
+          <input type="checkbox" id="scan-skip-existing" checked onchange="App.filterScanResults()">
+          Skip existing keys
+        </label>
+        <button onclick="App.scanSelectAll(true)" style="font-size:10px;color:#6366f1;background:none;border:none;cursor:pointer;padding:0">All</button>
+        <button onclick="App.scanSelectAll(false)" style="font-size:10px;color:#555;background:none;border:none;cursor:pointer;padding:0">None</button>
+      </div>
+      <!-- Results table -->
+      <div style="max-height:380px;overflow-y:auto;border:1px solid #1a1a2e;border-radius:6px">
+        <table style="width:100%;border-collapse:collapse;font-size:11px" id="scan-results-table">
+          <thead>
+            <tr style="background:#0d0d18;position:sticky;top:0">
+              <th style="padding:6px 8px;text-align:left;color:#555;font-weight:500;width:24px"></th>
+              <th style="padding:6px 8px;text-align:left;color:#555;font-weight:500;width:220px">Suggested Key</th>
+              <th style="padding:6px 8px;text-align:left;color:#555;font-weight:500">Text Value</th>
+              <th style="padding:6px 8px;text-align:left;color:#555;font-weight:500;width:100px">Source</th>
+            </tr>
+          </thead>
+          <tbody id="scan-results-body"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="UI.closeModal('modal-text-scan')">Cancel</button>
+      <button class="btn-primary" onclick="App.confirmTextScan()">
+        <span class="material-symbols-outlined" style="font-size:15px">add_circle</span>
+        Add Selected to Base Language
+      </button>
     </div>
   </div>
 </div>

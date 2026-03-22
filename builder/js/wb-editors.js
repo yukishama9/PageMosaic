@@ -515,6 +515,8 @@ const SharedDataEditor = {
 // ─── i18n Editor ─────────────────────────────────────────────────────────────
 const I18nEditor = {
   _lang: null,
+  _filterText: '',
+  _filterMissing: false,
 
   open(lang) {
     State.activeI18nLang = lang;
@@ -533,6 +535,12 @@ const I18nEditor = {
     document.getElementById('i18n-editor-title').textContent =
       `${lang}${langMeta?.label ? ` — ${langMeta.label}` : ''}`;
 
+    // Sync filter UI state
+    const searchEl = document.getElementById('i18n-search');
+    if (searchEl) searchEl.value = this._filterText;
+    const missingBtn = document.getElementById('i18n-filter-missing');
+    if (missingBtn) missingBtn.classList.toggle('active', this._filterMissing);
+
     this._renderTable();
   },
 
@@ -545,11 +553,24 @@ const I18nEditor = {
 
     // Collect all keys (union of base + current)
     const allKeys = new Set([...Object.keys(baseData), ...Object.keys(data)]);
-    const keys = Array.from(allKeys).sort();
-    const missing = keys.filter(k => !data[k] && !isBase);
+    let keys = Array.from(allKeys).sort();
+    const allMissing = keys.filter(k => !data[k] && !isBase);
 
     document.getElementById('i18n-missing-count').textContent =
-      missing.length > 0 ? `${missing.length} missing` : '';
+      allMissing.length > 0 ? `${allMissing.length} missing` : '';
+
+    // Apply filters
+    const filterText = (this._filterText || '').toLowerCase();
+    if (filterText) {
+      keys = keys.filter(k => {
+        return k.toLowerCase().includes(filterText)
+          || (baseData[k] || '').toLowerCase().includes(filterText)
+          || (data[k] || '').toLowerCase().includes(filterText);
+      });
+    }
+    if (this._filterMissing && !isBase) {
+      keys = keys.filter(k => !data[k]);
+    }
 
     let html = `<table class="i18n-table">
       <thead><tr>
@@ -585,9 +606,14 @@ const I18nEditor = {
       </tr>`;
     }
 
-    if (keys.length === 0) {
+    const totalKeys = Array.from(allKeys).length;
+    if (totalKeys === 0) {
       html += `<tr><td colspan="4" style="padding:24px;text-align:center;color:#444;font-size:12px">
         No translation keys yet. Click "Add Key" to create one.
+      </td></tr>`;
+    } else if (keys.length === 0) {
+      html += `<tr><td colspan="4" style="padding:24px;text-align:center;color:#444;font-size:12px">
+        No keys match current filter.
       </td></tr>`;
     }
 
@@ -602,6 +628,7 @@ const I18nEditor = {
         State.i18nData[lang][key] = input.value;
         input.classList.toggle('missing', !input.value && !isBase);
         this._updateMissingCount();
+        UI.renderLanguages(); // refresh progress badges
       });
     });
   },
@@ -657,10 +684,180 @@ const I18nEditor = {
     this._renderTable();
   },
 
+  // ── Filter helpers ────────────────────────────────────────────────────────────
+  setFilter(text) {
+    this._filterText = text || '';
+    this._renderTable();
+  },
+
+  toggleMissingFilter() {
+    this._filterMissing = !this._filterMissing;
+    const btn = document.getElementById('i18n-filter-missing');
+    if (btn) btn.classList.toggle('active', this._filterMissing);
+    this._renderTable();
+  },
+
+  // ── Export all translations as CSV ────────────────────────────────────────────
+  // Columns: key, lang1, lang2, …  (all languages in project)
+  exportCsv() {
+    const langs = (State.project?.languages || []).map(l => l.code);
+    const baseLang = State.project?.baseLanguage || (langs[0] || 'en');
+
+    // Collect union of all keys
+    const allKeys = new Set();
+    for (const lc of langs) {
+      Object.keys(State.i18nData[lc] || {}).forEach(k => allKeys.add(k));
+    }
+    const keys = Array.from(allKeys).sort();
+
+    // Build CSV: header row + data rows
+    const csvEscape = v => `"${String(v || '').replace(/"/g, '""')}"`;
+    const header = ['key', ...langs].map(csvEscape).join(',');
+    const rows = keys.map(key =>
+      [key, ...langs.map(lc => (State.i18nData[lc] || {})[key] || '')].map(csvEscape).join(',')
+    );
+    const csv = [header, ...rows].join('\r\n');
+
+    // Download
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${State.project?.name || 'project'}-translations.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    Utils.showToast('CSV exported.', 'info');
+  },
+
+  // ── Import translations from CSV ──────────────────────────────────────────────
+  // Accepted formats:
+  //   A) Full CSV:  key, lang1, lang2, …  (first row = headers, first col = key)
+  //   B) Pair CSV:  key, value            (import into current language)
+  importCsvFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target.result.replace(/^\uFEFF/, ''); // strip BOM
+      try {
+        const result = this._parseCsvImport(text);
+        this._applyImport(result);
+      } catch (err) {
+        Utils.showToast(`CSV import failed: ${err.message}`, 'error');
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
+  },
+
+  _parseCsvImport(text) {
+    // Parse CSV respecting quoted fields
+    const parseRow = (line) => {
+      const fields = [];
+      let cur = '', inQuote = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (inQuote) {
+          if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+          else if (ch === '"') { inQuote = false; }
+          else { cur += ch; }
+        } else {
+          if (ch === '"') { inQuote = true; }
+          else if (ch === ',') { fields.push(cur); cur = ''; }
+          else { cur += ch; }
+        }
+      }
+      fields.push(cur);
+      return fields;
+    };
+
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) throw new Error('CSV has fewer than 2 rows.');
+
+    const headers = parseRow(lines[0]).map(h => h.trim());
+    if (headers[0].toLowerCase() !== 'key') throw new Error('First column must be "key".');
+
+    const langCols = headers.slice(1); // column indexes → language codes or just 'value'
+    const result = {}; // { langCode: { key: value } }
+
+    const projectLangs = (State.project?.languages || []).map(l => l.code);
+
+    for (let i = 1; i < lines.length; i++) {
+      const row = parseRow(lines[i]);
+      const key = (row[0] || '').trim();
+      if (!key) continue;
+      for (let c = 0; c < langCols.length; c++) {
+        const colHeader = langCols[c];
+        // If column header matches a project language code, use it; else import into current lang
+        const targetLang = projectLangs.includes(colHeader) ? colHeader : this._lang;
+        if (!targetLang) continue;
+        if (!result[targetLang]) result[targetLang] = {};
+        const val = (row[c + 1] || '').trim();
+        if (val) result[targetLang][key] = val;
+      }
+    }
+    return result;
+  },
+
+  _applyImport(result) {
+    let totalUpdated = 0;
+    for (const [lc, entries] of Object.entries(result)) {
+      if (!State.i18nData[lc]) State.i18nData[lc] = {};
+      for (const [key, val] of Object.entries(entries)) {
+        State.i18nData[lc][key] = val;
+        totalUpdated++;
+      }
+    }
+    this._renderTable();
+    UI.renderLanguages();
+    Utils.showToast(`Imported ${totalUpdated} translation values.`, 'info');
+  },
+
+  // ── Import a single-language JSON file ────────────────────────────────────────
+  importJsonFile(file) {
+    if (!file || !this._lang) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const json = JSON.parse(e.target.result);
+        if (typeof json !== 'object' || Array.isArray(json)) throw new Error('Expected a JSON object { key: value }');
+        if (!State.i18nData[this._lang]) State.i18nData[this._lang] = {};
+        let count = 0;
+        for (const [key, val] of Object.entries(json)) {
+          if (typeof val === 'string') {
+            State.i18nData[this._lang][key] = val;
+            count++;
+          }
+        }
+        this._renderTable();
+        UI.renderLanguages();
+        Utils.showToast(`Imported ${count} keys into ${this._lang}.`, 'info');
+      } catch (err) {
+        Utils.showToast(`JSON import failed: ${err.message}`, 'error');
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
+  },
+
+  // ── Trigger CSV/JSON import via hidden file input ─────────────────────────────
+  triggerImport() {
+    const inp = document.getElementById('i18n-import-file');
+    if (inp) { inp.value = ''; inp.click(); }
+  },
+
+  onImportFileChange(input) {
+    const file = input.files?.[0];
+    if (!file) return;
+    if (file.name.endsWith('.json')) {
+      this.importJsonFile(file);
+    } else {
+      this.importCsvFile(file);
+    }
+  },
+
   async save() {
     if (!this._lang) return;
     await ProjectManager.saveI18n(this._lang);
     Utils.showToast(`Saved translations: ${this._lang}`, 'info');
+    UI.renderLanguages();
     Preview.renderCurrentPage();
   },
 };

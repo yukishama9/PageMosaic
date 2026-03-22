@@ -407,6 +407,137 @@ const SharedDataTemplates = {
   },
 };
 
+// ─── TextScanner — extract visible text strings from components & page metadata ─
+const TextScanner = {
+  // Tags whose text content we want to extract
+  TEXT_TAGS: new Set(['h1','h2','h3','h4','h5','h6','p','a','button','span','li','th','td','label','figcaption','blockquote','dt','dd','caption','legend','summary']),
+  // Attributes to scan
+  ATTR_TARGETS: ['alt', 'title', 'placeholder', 'aria-label'],
+  // Tags to skip entirely (including their subtree)
+  SKIP_TAGS: new Set(['script','style','template','pre','code','noscript','svg','math','head']),
+
+  /**
+   * Scan all components, page body content and page metadata.
+   * Returns: [{ key, text, source, type, attr, category }]
+   *   key      – suggested i18n key
+   *   text     – extracted string
+   *   source   – component id or page filename
+   *   type     – 'text' | 'attr' | 'meta'
+   *   attr     – attribute name if type==='attr'|'meta', null otherwise
+   *   category – 'global' (components) | 'page' (page body) | 'meta' (metadata)
+   */
+  async scan() {
+    const results = [];
+    const seenText = new Set(); // lowercase dedup
+
+    // 1. Components (HTML is in memory) → category: 'global'
+    for (const [compId, comp] of Object.entries(State.components || {})) {
+      if (!comp.html) continue;
+      const entries = this._scanHtml(comp.html, `comp.${compId}`, seenText, 'global');
+      results.push(...entries);
+    }
+
+    // 2. Page body content (read from disk) → category: 'page'
+    for (const page of (State.pages || [])) {
+      if (!State.projectHandle) continue;
+      const basename = Utils.pageName(page.file);
+      const html = await ProjectManager.readPage(page.file);
+      if (!html) continue;
+
+      // Strip @component blocks to avoid duplicating component text
+      const stripped = html.replace(/<!--\s*@component:[^>]+-->([\s\S]*?)<!--\s*\/@component:[^>]+-->/g, '');
+
+      // Parse body only
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(stripped, 'text/html');
+      const bodyEl = doc.body;
+      if (!bodyEl) continue;
+
+      const entries = this._scanHtml(bodyEl.innerHTML, `page.${basename}`, seenText, 'page');
+      results.push(...entries);
+    }
+
+    // 3. Page metadata (title, description) from project.json → category: 'meta'
+    for (const page of (State.pages || [])) {
+      const basename = Utils.pageName(page.file);
+      const meta = page.meta || {};
+      for (const field of ['title', 'description', 'ogTitle', 'ogDescription']) {
+        const text = (meta[field] || '').trim();
+        if (!text || text.includes('{{') || seenText.has(text.toLowerCase())) continue;
+        seenText.add(text.toLowerCase());
+        results.push({
+          key: `meta.${basename}.${this._camel2snake(field)}`,
+          text,
+          source: page.file,
+          type: 'meta',
+          attr: field,
+          category: 'meta',
+        });
+      }
+    }
+
+    return results;
+  },
+
+  /** Scan an HTML string within a given scope prefix */
+  _scanHtml(html, scope, seenText, category = 'global') {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const results = [];
+    const tagCounts = {};
+
+    const walk = (node) => {
+      if (node.nodeType !== Node.ELEMENT_NODE) return;
+      const tag = node.tagName.toLowerCase();
+      if (this.SKIP_TAGS.has(tag)) return;
+
+      // Scan text-bearing attributes
+      for (const attr of this.ATTR_TARGETS) {
+        const val = node.getAttribute(attr);
+        if (!val || val.includes('{{')) continue;
+        const text = val.trim();
+        if (text.length < 2 || seenText.has(text.toLowerCase())) continue;
+        seenText.add(text.toLowerCase());
+        const slot = `${tag}_${attr}`;
+        tagCounts[slot] = (tagCounts[slot] || 0) + 1;
+        results.push({ key: `${scope}.${slot}_${tagCounts[slot]}`, text, source: scope, type: 'attr', attr, category });
+      }
+
+      // Scan direct text content for target tags
+      if (this.TEXT_TAGS.has(tag)) {
+        const directText = this._directText(node);
+        if (directText && directText.length >= 2 && !directText.includes('{{')) {
+          const norm = directText.toLowerCase();
+          if (!seenText.has(norm)) {
+            seenText.add(norm);
+            tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+            results.push({ key: `${scope}.${tag}_${tagCounts[tag]}`, text: directText, source: scope, type: 'text', attr: null, category });
+          }
+        }
+      }
+
+      for (const child of node.childNodes) walk(child);
+    };
+
+    walk(doc.body || doc.documentElement);
+    return results;
+  },
+
+  /** Concatenate only direct (non-element) text nodes */
+  _directText(el) {
+    let t = '';
+    for (const n of el.childNodes) {
+      if (n.nodeType === Node.TEXT_NODE) t += n.textContent;
+    }
+    return t.replace(/\s+/g, ' ').trim();
+  },
+
+  /** camelCase → snake_case helper for meta field names */
+  _camel2snake(s) {
+    return s.replace(/([A-Z])/g, m => '_' + m.toLowerCase());
+  },
+};
+
 // ─── Page Templates ───────────────────────────────────────────────────────────
 const PageTemplates = {
   blank: (title, lang) => `<!DOCTYPE html>

@@ -492,7 +492,12 @@ const App = {
     State.project.title = document.getElementById('settings-title').value.trim() || State.project.title;
     document.getElementById('project-name-display').textContent = State.project.title;
 
-    // CSS Mode
+    // Canonical Base URL
+    const canonicalBaseEl = document.getElementById('settings-canonical-base');
+    if (canonicalBaseEl) {
+      State.project.canonicalBase = canonicalBaseEl.value.trim().replace(/\/$/, '') || '';
+    }
+
     const cssModeEl = document.getElementById('settings-css-mode');
     if (cssModeEl) {
       State.project.cssMode = cssModeEl.value || 'tailwind-cdn';
@@ -593,6 +598,151 @@ const App = {
       `"${label}" synced — ${synced} page(s) rebuilt from index.html${failed > 0 ? `, ${failed} failed` : ''}.`,
       'info', 4000
     );
+  },
+
+  // ── Text Scan ──────────────────────────────────────────────────────────────────
+  async runTextScan() {
+    if (!State.project) { Utils.showToast('Open a project first.', 'error'); return; }
+    Utils.showToast('Scanning text…', 'info', 1500);
+    this._scanResults = await TextScanner.scan();
+    if (this._scanResults.length === 0) {
+      Utils.showToast('No text found to extract.', 'info');
+      return;
+    }
+    // Reset filter UI
+    const filterEl = document.getElementById('scan-filter');
+    if (filterEl) filterEl.value = '';
+    const skipEl = document.getElementById('scan-skip-existing');
+    if (skipEl) skipEl.checked = true;
+
+    this.filterScanResults();
+    UI.openModal('modal-text-scan');
+  },
+
+  filterScanResults(text) {
+    const results = this._scanResults || [];
+    const baseLang = State.project?.baseLanguage || 'en';
+    const baseData = State.i18nData[baseLang] || {};
+
+    const filterText = (text || document.getElementById('scan-filter')?.value || '').toLowerCase();
+    const skipExisting = document.getElementById('scan-skip-existing')?.checked !== false;
+
+    const filtered = results.filter(r => {
+      if (skipExisting && baseData[r.key] !== undefined) return false;
+      if (filterText && !r.key.toLowerCase().includes(filterText) && !r.text.toLowerCase().includes(filterText)) return false;
+      return true;
+    });
+
+    const body = document.getElementById('scan-results-body');
+    const summary = document.getElementById('scan-summary');
+    if (!body) return;
+
+    const totalNew = results.filter(r => baseData[r.key] === undefined).length;
+    if (summary) {
+      summary.textContent = `Found ${results.length} strings — ${totalNew} new (not in base lang "${baseLang}"). Showing ${filtered.length}.`;
+    }
+
+    if (filtered.length === 0) {
+      body.innerHTML = `<tr><td colspan="4" style="padding:20px;text-align:center;color:#444">No results match current filter.</td></tr>`;
+      this._scanFiltered = [];
+      return;
+    }
+
+    // Group by category
+    const groups = { global: [], page: [], meta: [] };
+    filtered.forEach((r, idx) => groups[r.category]?.push({ r, idx }));
+
+    const groupMeta = {
+      global: { label: '🌐 Global — Components (shared across all pages)', color: '#4f46e5' },
+      page:   { label: '📄 Page Content (unique per page)', color: '#0891b2' },
+      meta:   { label: '📋 Page Metadata (title, description, OG)', color: '#7c3aed' },
+    };
+
+    let html = '';
+    for (const [cat, items] of Object.entries(groups)) {
+      if (items.length === 0) continue;
+      const gm = groupMeta[cat];
+      // Group header row with select-all for this group
+      html += `<tr>
+        <td colspan="4" style="padding:6px 8px;background:#0a0a14;border-top:1px solid #1a1a2e">
+          <span style="font-size:10px;font-weight:600;color:${gm.color}">${gm.label}</span>
+          <span style="float:right;font-size:10px;color:#444">
+            <a href="#" onclick="App._scanGroupSelect('${cat}',true);return false" style="color:#4f46e5;text-decoration:none">all</a> /
+            <a href="#" onclick="App._scanGroupSelect('${cat}',false);return false" style="color:#444;text-decoration:none">none</a>
+          </span>
+        </td>
+      </tr>`;
+      for (const { r, idx } of items) {
+        const keyId = `scan-key-${idx}`;
+        const existing = baseData[r.key];
+        const rowStyle = existing ? 'opacity:0.4' : '';
+        const typeBadge = r.type === 'attr' ? '🏷' : '📝';
+        html += `<tr style="border-top:1px solid #0d0d18;${rowStyle}" data-cat="${cat}">
+          <td style="padding:4px 8px">
+            <input type="checkbox" class="scan-cb" data-idx="${idx}" data-cat="${cat}" ${existing ? '' : 'checked'}>
+          </td>
+          <td style="padding:4px 8px">
+            <input type="text" id="${keyId}" value="${Utils.escapeHtml(r.key)}"
+                   style="width:100%;background:#080810;border:1px solid #1e1e2a;border-radius:3px;color:#818cf8;font-family:monospace;font-size:10px;padding:2px 5px;outline:none">
+          </td>
+          <td style="padding:4px 8px;color:#bbb;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${Utils.escapeHtml(r.text)}">
+            ${typeBadge} ${Utils.escapeHtml(r.text.substring(0, 55))}${r.text.length > 55 ? '…' : ''}
+          </td>
+          <td style="padding:4px 8px;color:#444;font-size:10px">${Utils.escapeHtml(r.source.replace(/^(comp\.|page\.)/, ''))}</td>
+        </tr>`;
+      }
+    }
+
+    body.innerHTML = html;
+    this._scanFiltered = filtered;
+  },
+
+  _scanGroupSelect(cat, checked) {
+    document.querySelectorAll(`#scan-results-body .scan-cb[data-cat="${cat}"]`).forEach(cb => cb.checked = checked);
+  },
+
+  scanSelectAll(checked) {
+    document.querySelectorAll('#scan-results-body .scan-cb').forEach(cb => cb.checked = checked);
+  },
+
+  confirmTextScan() {
+    const baseLang = State.project?.baseLanguage || 'en';
+    if (!State.i18nData[baseLang]) State.i18nData[baseLang] = {};
+
+    const filtered = this._scanFiltered || [];
+    const tbody = document.getElementById('scan-results-body');
+    const checkboxes = tbody ? tbody.querySelectorAll('.scan-cb') : [];
+
+    let added = 0;
+    checkboxes.forEach((cb, idx) => {
+      if (!cb.checked) return;
+      const item = filtered[idx];
+      if (!item) return;
+      // Read (possibly user-edited) key from input
+      const keyInput = document.getElementById(`scan-key-${idx}`);
+      const key = (keyInput ? keyInput.value.trim() : item.key);
+      if (!key) return;
+      State.i18nData[baseLang][key] = item.text;
+      // Add placeholder for other languages
+      for (const l of (State.project.languages || [])) {
+        if (l.code !== baseLang) {
+          if (!State.i18nData[l.code]) State.i18nData[l.code] = {};
+          if (State.i18nData[l.code][key] === undefined) {
+            State.i18nData[l.code][key] = '';
+          }
+        }
+      }
+      added++;
+    });
+
+    UI.closeModal('modal-text-scan');
+    if (added > 0) {
+      UI.renderLanguages();
+      if (State.activeI18nLang) I18nEditor._renderTable();
+      Utils.showToast(`Added ${added} key(s) to base language (${baseLang}).`, 'info');
+    } else {
+      Utils.showToast('No keys selected.', 'info');
+    }
   },
 
   // ── Code panel toggle ──────────────────────────────────────────────────────────

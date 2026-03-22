@@ -80,12 +80,32 @@ const UI = {
   renderLanguages() {
     const el = document.getElementById('section-languages');
     const langs = State.project?.languages || [];
-    el.innerHTML = langs.map(lang => `
+    const baseLang = State.project?.baseLanguage;
+    // Compute total keys from base language
+    const baseKeys = baseLang ? Object.keys(State.i18nData[baseLang] || {}) : [];
+    const totalKeys = baseKeys.length;
+
+    el.innerHTML = langs.map(lang => {
+      // Compute translation completion for non-base languages
+      let progressHtml = '';
+      if (!lang.isBase && totalKeys > 0) {
+        const langData = State.i18nData[lang.code] || {};
+        const filled = baseKeys.filter(k => langData[k] && langData[k].trim() !== '').length;
+        const pct = Math.round((filled / totalKeys) * 100);
+        const color = pct === 100 ? '#22c55e' : pct >= 50 ? '#f97316' : '#ef4444';
+        progressHtml = `<span style="font-size:9px;color:${color};margin-left:auto;flex-shrink:0">${filled}/${totalKeys}</span>`;
+      } else if (lang.isBase) {
+        progressHtml = `<span style="font-size:9px;color:#555;margin-left:auto;flex-shrink:0">${totalKeys} keys</span>`;
+      }
+
+      return `
       <div class="sidebar-item ${State.activeI18nLang === lang.code ? 'active' : ''}"
            onclick="I18nEditor.open('${lang.code}')" title="${lang.label || lang.code}">
         <span class="material-symbols-outlined text-yellow-800" style="font-size:13px;flex-shrink:0">translate</span>
         <span class="item-label">${Utils.escapeHtml(lang.code)}${lang.isBase ? ' <span style="color:#555;font-size:10px">(base)</span>' : ''}</span>
-      </div>`).join('');
+        ${progressHtml}
+      </div>`;
+    }).join('');
   },
 
   updatePreviewLangSelect() {
@@ -246,6 +266,12 @@ const UI = {
       cssModeEl.value = State.project.cssMode || 'tailwind-cdn';
       this._updateCssModeHint(cssModeEl.value, cssHintEl);
       cssModeEl.onchange = () => this._updateCssModeHint(cssModeEl.value, cssHintEl);
+    }
+
+    // Canonical Base URL
+    const canonicalBaseEl = document.getElementById('settings-canonical-base');
+    if (canonicalBaseEl) {
+      canonicalBaseEl.value = State.project.canonicalBase || '';
     }
 
     // Folder paths

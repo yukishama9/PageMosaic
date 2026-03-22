@@ -239,10 +239,11 @@ const ProjectManager = {
       langEntries.push({ code: lang.code, display: lang.display || lang.code.toUpperCase(), label: lang.code, isBase: false });
     }
 
-    // Detect CSS mode from index.html (or first HTML file)
+    // Detect CSS mode and theme tokens from index.html (or first HTML file)
     const primaryHtmlFile = htmlFiles.find(f => f.name === 'index.html') || htmlFiles[0];
     const primaryHtmlContent = await FileHandler.readFile(destHandle, primaryHtmlFile.name) || '';
     const detectedCssMode = this._detectCssMode(primaryHtmlContent);
+    const detectedTheme = this._extractThemeFromHtml(primaryHtmlContent);
 
     // Build and write project.json (initial — before sync)
     const project = {
@@ -254,6 +255,7 @@ const ProjectManager = {
       components: componentMetas,
       sharedData: sharedDataMetas,
       cssMode: detectedCssMode,
+      ...(detectedTheme ? { theme: detectedTheme } : {}),
       importedFrom: srcHandle.name,
       created: Utils.formatDate(),
       lastModified: Utils.formatDate(),
@@ -1031,10 +1033,77 @@ const ProjectManager = {
   _detectCssMode(htmlContent) {
     if (!htmlContent) return 'custom';
     if (htmlContent.includes('cdn.tailwindcss.com')) return 'tailwind-cdn';
-    // Check for local tailwind link (e.g. assets/css/tailwind.css)
     if (/assets\/css\/tailwind\.css/.test(htmlContent) ||
         /tailwind-config/.test(htmlContent)) return 'tailwind-local';
     return 'custom';
+  },
+
+  // ── Extract theme tokens from HTML (Tailwind CDN config + Google Fonts) ───────
+  // Returns: { colors: {}, fonts: { headline, body, label }, cssMode }
+  // Tries to parse inline Tailwind config or CSS variables.
+  _extractThemeFromHtml(htmlContent) {
+    if (!htmlContent) return null;
+
+    const theme = { colors: {}, fonts: {}, cssMode: this._detectCssMode(htmlContent) };
+
+    // ── Colors: try to read tailwind.config ──────────────────────────────────
+    // Pattern: tailwind.config = { theme: { extend: { colors: { ... } } } }
+    // or:      tailwind.config = { theme: { colors: { ... } } }
+    const twConfigMatch = htmlContent.match(/tailwind\.config\s*=\s*(\{[\s\S]*?\})\s*(?:<\/script>|;?\s*\n)/);
+    if (twConfigMatch) {
+      try {
+        // Safely evaluate the object literal by wrapping in a function scope
+        // eslint-disable-next-line no-new-func
+        const cfg = Function('"use strict"; return (' + twConfigMatch[1] + ')')();
+        const colorMap = cfg?.theme?.extend?.colors || cfg?.theme?.colors || {};
+        for (const [key, val] of Object.entries(colorMap)) {
+          if (typeof val === 'string') theme.colors[key] = val;
+          else if (typeof val === 'object') {
+            // Use DEFAULT or '500' as representative value
+            theme.colors[key] = val['DEFAULT'] || val['500'] || Object.values(val)[0] || '';
+          }
+        }
+      } catch { /* invalid JS — skip */ }
+    }
+
+    // ── Colors: CSS variables fallback (--color-primary: #xxx or --tw-color-*) ─
+    if (Object.keys(theme.colors).length === 0) {
+      const cssVarRe = /--(?:color-|tw-color-)?([a-zA-Z][a-zA-Z0-9-]*):\s*(#[0-9a-fA-F]{3,8}|rgba?\([^)]+\))/g;
+      let m;
+      while ((m = cssVarRe.exec(htmlContent)) !== null) {
+        const name = m[1].replace(/-([a-z])/g, (_, c) => c.toUpperCase()); // kebab→camel
+        theme.colors[name] = m[2];
+      }
+    }
+
+    // ── Fonts: Google Fonts <link> ────────────────────────────────────────────
+    const gfRe = /fonts\.googleapis\.com\/css[^"']*family=([^"'&]+)/g;
+    const fontFamilies = [];
+    let fm;
+    while ((fm = gfRe.exec(htmlContent)) !== null) {
+      const families = decodeURIComponent(fm[1]).split('|');
+      for (const f of families) {
+        const name = f.split(':')[0].replace(/\+/g, ' ').trim();
+        if (name && !fontFamilies.includes(name)) fontFamilies.push(name);
+      }
+    }
+    if (fontFamilies.length > 0) {
+      // Heuristic: first CJK/serif font → headline, last sans → body, middle → label
+      const serifKeywords = ['Garamond','Playfair','Newsreader','Cormorant','Lora','Merriweather','Noto Serif','EB Garamond','DM Serif'];
+      const monoKeywords = ['Mono','Code','JetBrains','Fira','Space Mono','IBM Plex Mono'];
+      const serifFonts = fontFamilies.filter(f => serifKeywords.some(k => f.includes(k)));
+      const monoFonts = fontFamilies.filter(f => monoKeywords.some(k => f.includes(k)));
+      const sansFonts = fontFamilies.filter(f => !serifKeywords.some(k => f.includes(k)) && !monoKeywords.some(k => f.includes(k)));
+
+      theme.fonts.headline = serifFonts[0] || sansFonts[0] || fontFamilies[0];
+      theme.fonts.body = sansFonts[0] || fontFamilies[0];
+      theme.fonts.label = monoFonts[0] || sansFonts[1] || sansFonts[0] || fontFamilies[0];
+    }
+
+    // Only return if we found something useful
+    const hasColors = Object.keys(theme.colors).length > 0;
+    const hasFonts = Object.keys(theme.fonts).length > 0;
+    return (hasColors || hasFonts) ? theme : null;
   },
 
   // ── Update cssMode in project.json and State ──────────────────────────────────
@@ -1477,6 +1546,13 @@ const ProjectManager = {
     // List HTML files in project root (for sync later)
     const entries = await FileHandler.listEntries(State.projectHandle);
     const htmlFiles = entries.filter(e => e.kind === 'file' && e.name.endsWith('.html'));
+
+    // Extract theme + CSS mode from index.html
+    const indexHtmlContent = await FileHandler.readFile(State.projectHandle, 'index.html') || '';
+    const reimportedCssMode = this._detectCssMode(indexHtmlContent);
+    const reimportedTheme = this._extractThemeFromHtml(indexHtmlContent);
+    if (reimportedCssMode) State.project.cssMode = reimportedCssMode;
+    if (reimportedTheme) State.project.theme = reimportedTheme;
 
     // Extract from index.html
     const extracted = await this._extractFromIndex(State.projectHandle, htmlFiles);
