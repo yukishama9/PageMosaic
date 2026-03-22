@@ -2,156 +2,59 @@
 
 > Visual static-site editor — edit reusable components once, sync across every page, manage multi-language content.
 
-PageMosaic is a lightweight desktop tool for building and maintaining static HTML websites. It gives you a visual workspace where you can manage **reusable components** (navbar, footer, cookie banner, etc.), **multi-language translations**, and **page content** — all in one place, with a live preview.
+PageMosaic is a lightweight desktop tool for building and maintaining static HTML websites. No framework. No build step. Pure HTML files you own completely.
 
-No framework. No build step. Pure HTML files you own completely.
+🌐 **Project homepage:** https://yukishama9.github.io/PageMosaic/
 
 ---
+
+🧩 **Component-based editing** — Edit a component once, every page updates automatically.  
+🌍 **Multi-language (i18n)** — Spreadsheet-style translation editor with missing-key highlighting.  
+🎨 **Theme editor** — Visual color, font, and shape controls with Tailwind CDN / Local / Custom CSS modes.  
+🖼 **Live preview** — Desktop / Tablet / Mobile switcher with per-language, instant hot-reload preview.  
+📥 **Import existing sites** — Auto-detects headers, footers, and cookie banners from any HTML folder.  
+📤 **Export** — Clean per-language output with metadata, OG tags, and custom head code injected automatically.
+
+---
+
 ### ☕ Support this project
 [![Support my work](https://img.shields.io/badge/Support-Buy%20me%20a%20coffee-orange?style=for-the-badge)](https://yukishama9.github.io/Helios-Blog/)
 
-## What PageMosaic can do
-
-### 🧩 Component-based editing
-Define reusable blocks (navbar, footer, cookie consent, etc.) as **components**. Edit a component once — PageMosaic rewrites every page that uses it automatically.
-
-Pages reference components with a simple HTML comment:
-```html
-<!-- @component:navbar -->
-<main>…</main>
-<!-- @component:footer -->
-<!-- @component:cookie-banner -->
-```
-
-### 🌍 Multi-language support (i18n)
-- Manage translation keys in a spreadsheet-style editor
-- Missing translations are highlighted in orange
-- At export time, each language gets its own output folder with all strings resolved
-
-### 🎨 Theme editor
-- Visual color palette, typography, and border-radius controls
-- **Tailwind CDN mode**: theme config injected at runtime — changes are instant with no compilation step
-- **Tailwind Local mode**: theme saved to `tailwind.config.js`; auto-compiles `assets/css/tailwind.css` via the Tailwind CLI (Electron only)
-- **Custom CSS mode**: Theme Editor disabled; manage your own stylesheets directly
-
-### 📦 Shared data
-Menus, social links, language switchers — define them once and reuse them across any component with template loops:
-```html
-<!-- @each:main-menu -->
-<a href="{{item.href}}">{{t:item.i18nKey}}</a>
-<!-- @/each -->
-```
-
-### 🖼 Live preview
-- Desktop / Tablet / Mobile viewport switcher
-- Per-language preview
-- Instant hot-reload as you type in the code editor
-
-### 📥 Import existing sites
-Drop any existing HTML folder into PageMosaic. It auto-detects `<header>`, `<footer>`, and cookie-banner elements and converts them into editable components. No manual setup required.
-
-### 📤 Export
-Generates a clean output folder per language under your chosen `releases/` directory. Page metadata (title, description, OG tags, canonical) is injected automatically. Custom `<head>` code (analytics, favicons, hreflang) is appended to every page.
-
 ---
 
-## Project structure
+## Quick Start
 
-```
-pagemosaic/
-├── builder/            # App source — HTML, CSS, JS (no build step required)
-│   ├── index.html
-│   ├── css/
-│   │   └── builder.css
-│   └── js/
-│       ├── wb-core.js       # State, Utils, FileHandler
-│       ├── wb-project.js    # Project management (CRUD, import, export)
-│       ├── wb-ui.js         # Sidebar, tabs, modals
-│       ├── wb-editors.js    # Page, Component, SharedData, i18n, Theme editors
-│       ├── wb-preview.js    # Live iframe preview & ThemeEngine
-│       └── wb-app.js        # Entry point & action handlers
-├── electron/           # Electron main process (desktop builds only)
-│   ├── main.js         # BrowserWindow + IPC file-system & Tailwind compile handlers
-│   └── preload.js      # contextBridge — exposes electronAPI to renderer
-├── resources/          # Reusable CSS snippets and script templates
-├── .github/
-│   └── workflows/
-│       └── release.yml # CI/CD — builds installers on every version tag push
-├── forge.config.js     # Electron Forge packaging config (Win / macOS / Linux)
-├── package.json
-├── start.bat           # Quick-start via Python HTTP server (browser mode)
-├── LICENSE             # MIT
-└── README.md
-```
+### 📦 Download (Recommended)
 
-> **Note:** `projects/` and `releases/` are **not** part of the repository.  
-> You choose where to store them via the app's Workspace setup at first launch.
+Download the latest installer from [GitHub Releases](https://github.com/yukishama9/PageMosaic/releases):
 
----
+| Platform | File |
+|----------|------|
+| Windows  | `.exe` installer |
+| macOS    | `.dmg` |
+| Linux    | `.deb` / `.rpm` / `.zip` |
 
-## Usage — Browser (no install)
+### 🌐 Browser Mode (No installation)
 
 ```bash
-# Clone the repository
-git clone https://github.com/yukishama9/pagemosaic.git
-cd pagemosaic
+git clone https://github.com/yukishama9/PageMosaic.git
+cd PageMosaic
 
-# Windows: double-click start.bat, or run:
+# Windows — double-click start.bat, or:
 start.bat
 
 # macOS / Linux:
 python3 -m http.server 8765
-# then open http://localhost:8765/builder/ in your browser
+# Open http://localhost:8765/builder/
 ```
 
-On first launch, click **Set** next to **Projects folder** and **Releases folder** to configure where your work is stored. This is remembered across sessions.
-
----
-
-## Usage — Desktop App (Electron)
-
-```bash
-# Install dependencies
-npm install
-
-# Run in development mode (opens DevTools automatically)
-npm run dev
-
-# Run without DevTools
-npm start
-```
-
----
-
-## Building installers
-
-Requires [Node.js 20+](https://nodejs.org/) and [npm](https://npmjs.com).
+### 🖥 Electron Dev Mode
 
 ```bash
 npm install
-
-# Build for the current platform
-npm run make
-
-# Build for a specific platform (must run on that OS, or use CI)
-npm run make -- --platform=win32    # Windows .exe
-npm run make -- --platform=darwin   # macOS .dmg
-npm run make -- --platform=linux    # Linux .deb / .rpm / .zip
+npm start          # run normally
+npm run dev        # run with DevTools
 ```
-
-Outputs land in `out/make/`.
-
----
-
-## CSS modes
-
-PageMosaic supports three CSS modes, configurable per project in **Project Settings**:
-
-| Mode | Description |
-|------|-------------|
-| **Tailwind CDN** | Tailwind loaded from CDN. Theme config is injected as a `<script>` block at runtime. Zero setup. |
-| **Tailwind Local** | Uses a locally compiled `assets/css/tailwind.css`. In Electron mode, saving the Theme Editor auto-runs `npx tailwindcss` to recompile. |
-| **Custom CSS** | No Tailwind. Theme Editor is disabled. Manage your own stylesheets directly — any CSS framework or hand-written CSS. |
 
 ---
 
