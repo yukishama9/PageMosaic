@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640">
+  <defs>
+    <!-- 背景渐变 -->
+    <linearGradient id="bannerBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b1120"/>
+      <stop offset="100%" stop-color="#151e32"/>
+    </linearGradient>
+    
+    <!-- 网格图案 (体现编辑器画布) -->
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.5" fill="#334155" opacity="0.4"/>
+    </pattern>
+
+    <!-- 复用 Logo 的渐变 -->
+    <linearGradient id="gBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/><stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+    <linearGradient id="gPurple" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8b5cf6"/><stop offset="100%" stop-color="#6d28d9"/>
+    </linearGradient>
+    <linearGradient id="gCyan" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#06b6d4"/><stop offset="100%" stop-color="#0891b2"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 背景层 -->
+  <rect width="1280" height="640" fill="url(#bannerBg)"/>
+  <rect width="1280" height="640" fill="url(#grid)"/>
+
+  <!-- 左侧 Logo 容器 (缩放并平移) -->
+  <g transform="translate(200, 160) scale(0.625)">
+    <!-- 圆角底板 -->
+    <rect width="512" height="512" rx="112" fill="#0f172a" stroke="#1e293b" stroke-width="4"/>
+    <rect x="100" y="100" width="100" height="312" rx="24" fill="url(#gBlue)"/>
+    <rect x="220" y="100" width="192" height="100" rx="24" fill="url(#gPurple)"/>
+    <rect x="220" y="220" width="192" height="192" rx="24" fill="url(#gCyan)"/>
+    <path d="M 280 286 L 250 316 L 280 346" fill="none" stroke="#ffffff" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+    <path d="M 330 280 L 300 352" fill="none" stroke="#ffffff" stroke-width="20" stroke-linecap="round" opacity="0.9"/>
+    <path d="M 350 286 L 380 316 L 350 346" fill="none" stroke="#ffffff" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+  </g>
+
+  <!-- 右侧文字区域 -->
+  <!-- 主标题 -->
+  <text x="580" y="300" font-family="system-ui, -apple-system, sans-serif" font-size="88" font-weight="800" fill="#f8fafc" letter-spacing="-1">PageMosaic</text>
+  
+  <!-- 副标题 -->
+  <text x="585" y="360" font-family="system-ui, -apple-system, sans-serif" font-size="32" font-weight="500" fill="#94a3b8">A Simple &amp; Modern Web HTML Editor</text>
+  
+  <!-- 装饰性代码标签 -->
+  <rect x="585" y="420" width="120" height="40" rx="8" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+  <text x="645" y="446" font-family="monospace" font-size="16" font-weight="600" fill="#cbd5e1" text-anchor="middle">&lt;html /&gt;</text>
+  
+  <rect x="720" y="420" width="120" height="40" rx="8" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+  <text x="780" y="446" font-family="monospace" font-size="16" font-weight="600" fill="#cbd5e1" text-anchor="middle">WYSIWYG</text>
+</svg>

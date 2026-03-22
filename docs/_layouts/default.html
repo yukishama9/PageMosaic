@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="{{ site.description }}">
+  <meta name="author" content="{{ site.author }}">
+  <meta property="og:title" content="{{ page.title | default: site.title }}">
+  <meta property="og:description" content="{{ site.description }}">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="{{ page.url | absolute_url }}">
+  <meta property="og:image" content="{{ site.url }}/assets/img/logo.svg">
+  <title>{{ page.title | default: site.title }}</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg:       #0d0d18;
+      --bg2:      #131320;
+      --bg3:      #1a1a2e;
+      --fg:       #e5e2e1;
+      --fg2:      #a8a5a0;
+      --accent:   #6366f1;
+      --gold:     #e9c176;
+      --border:   #2a2a36;
+      --codebg:   #0a0a14;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.6;
+    }
+
+    /* ── Nav ── */
+    .nav {
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      padding: 0.9rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .nav-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--fg);
+    }
+    .nav-brand img { height: 26px; width: 26px; }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 1.75rem;
+    }
+    .nav-links a {
+      color: var(--fg2);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color .2s;
+    }
+    .nav-links a:hover { color: var(--accent); }
+    .nav-gh {
+      background: var(--accent);
+      color: #fff !important;
+      padding: 0.45rem 1rem;
+      border-radius: 6px;
+      font-size: 0.875rem !important;
+      font-weight: 500;
+      transition: background .2s, transform .15s !important;
+    }
+    .nav-gh:hover { background: #4f46e5 !important; transform: translateY(-1px); }
+
+    /* ── Hero ── */
+    .hero {
+      padding: 6rem 2rem 5rem;
+      text-align: center;
+      background: linear-gradient(150deg, var(--bg) 0%, var(--bg2) 100%);
+      border-bottom: 1px solid var(--border);
+    }
+    .hero img.logo { height: 80px; width: 80px; margin: 0 auto 1.75rem; display: block; }
+    .hero h1 { font-size: 2.8rem; font-weight: 800; letter-spacing: -.5px; margin-bottom: .75rem; }
+    .hero p {
+      font-size: 1.15rem;
+      color: var(--fg2);
+      max-width: 600px;
+      margin: 0 auto 2.25rem;
+      line-height: 1.8;
+    }
+    .hero-btns { display: flex; gap: .875rem; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      padding: .7rem 1.4rem;
+      border-radius: 6px;
+      font-size: .95rem;
+      font-weight: 500;
+      text-decoration: none;
+      display: inline-block;
+      transition: all .2s;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #4f46e5; transform: translateY(-2px); }
+    .btn-outline {
+      background: transparent;
+      color: var(--fg);
+      border: 1px solid var(--border);
+    }
+    .btn-outline:hover { background: var(--bg3); }
+
+    /* ── Sections ── */
+    main { max-width: 1100px; margin: 0 auto; padding: 4rem 2rem; }
+    section { margin-bottom: 4.5rem; }
+    section > h2 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 1.75rem;
+      color: var(--fg);
+    }
+
+    /* ── Feature Grid ── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+      gap: 1.5rem;
+    }
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.75rem;
+      transition: border-color .2s, background .2s;
+    }
+    .card:hover { border-color: var(--accent); background: var(--bg3); }
+    .card h3 { color: var(--accent); font-size: 1.05rem; margin-bottom: .75rem; }
+    .card p { color: var(--fg2); line-height: 1.75; font-size: .95rem; }
+
+    /* ── Code blocks ── */
+    pre {
+      background: var(--codebg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      overflow-x: auto;
+      margin: 1.25rem 0;
+    }
+    code {
+      font-family: 'SFMono-Regular', Consolas, 'Courier New', monospace;
+      font-size: .9rem;
+      color: #a8d8ea;
+    }
+    pre code { color: var(--fg2); }
+    p code, li code {
+      background: var(--codebg);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 1px 5px;
+      font-size: .875em;
+      color: var(--accent);
+    }
+
+    section h3 {
+      font-size: 1.1rem;
+      margin: 1.75rem 0 .6rem;
+      color: var(--fg);
+    }
+    section p { color: var(--fg2); line-height: 1.75; margin-bottom: .75rem; }
+
+    /* ── Table ── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-top: 1.25rem;
+    }
+    thead th {
+      background: var(--bg3);
+      color: var(--accent);
+      padding: .875rem 1rem;
+      text-align: left;
+      font-size: .9rem;
+      border-bottom: 1px solid var(--border);
+    }
+    tbody td {
+      padding: .875rem 1rem;
+      color: var(--fg2);
+      border-bottom: 1px solid var(--border);
+      font-size: .9rem;
+      line-height: 1.6;
+    }
+    tbody tr:last-child td { border-bottom: none; }
+
+    /* ── Why list ── */
+    .why-list { list-style: none; padding: 0; }
+    .why-list li {
+      display: flex;
+      gap: .75rem;
+      margin-bottom: 1rem;
+      color: var(--fg2);
+      line-height: 1.7;
+    }
+    .why-list li::before {
+      content: "✓";
+      color: var(--accent);
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: .05rem;
+    }
+    .why-list strong { color: var(--fg); }
+
+    /* ── Badge strip ── */
+    .badges { display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .badge {
+      display: inline-block;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: .3rem .9rem;
+      font-size: .8rem;
+      color: var(--fg2);
+    }
+
+    /* ── Footer ── */
+    footer {
+      background: var(--bg2);
+      border-top: 1px solid var(--border);
+      padding: 2rem;
+      text-align: center;
+      color: var(--fg2);
+      font-size: .875rem;
+      line-height: 2;
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+
+    /* ── Responsive ── */
+    @media (max-width: 680px) {
+      .hero h1 { font-size: 2rem; }
+      .nav-links a:not(.nav-gh) { display: none; }
+      main { padding: 2.5rem 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/PageMosaic/" class="nav-brand">
+      <img src="/PageMosaic/assets/img/logo.svg" alt="PageMosaic">
+      PageMosaic
+    </a>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#get-started">Get Started</a>
+      <a href="/PageMosaic/blog/">Blog</a>
+      <a href="{{ site.repository }}" class="nav-gh">View on GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<section class="hero">
+  <img src="/PageMosaic/assets/img/logo.svg" alt="PageMosaic" class="logo">
+  <h1>PageMosaic</h1>
+  <p>Visual static-site editor — edit reusable components once, sync across every page, manage multi-language content.</p>
+  <div class="hero-btns">
+    <a href="{{ site.repository }}" class="btn btn-primary">View on GitHub</a>
+    <a href="#get-started" class="btn btn-outline">Get Started</a>
+  </div>
+</section>
+
+<main>
+
+  <!-- Features -->
+  <section id="features">
+    <h2>What PageMosaic Can Do</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>🧩 Component-based Editing</h3>
+        <p>Define reusable blocks (navbar, footer, cookie consent) as components. Edit once — PageMosaic rewrites every page that uses it automatically.</p>
+      </div>
+      <div class="card">
+        <h3>🌍 Multi-language Support</h3>
+        <p>Manage translation keys in a spreadsheet-style editor. Missing translations are highlighted. Each language gets its own output folder at export time.</p>
+      </div>
+      <div class="card">
+        <h3>🎨 Theme Editor</h3>
+        <p>Visual color palette, typography, and border-radius controls. Choose between Tailwind CDN, Tailwind Local, or Custom CSS modes.</p>
+      </div>
+      <div class="card">
+        <h3>🖼 Live Preview</h3>
+        <p>Desktop / Tablet / Mobile viewport switcher. Per-language preview. Instant hot-reload as you type in the code editor.</p>
+      </div>
+      <div class="card">
+        <h3>📥 Import Existing Sites</h3>
+        <p>Drop any existing HTML folder into PageMosaic. It auto-detects headers, footers, and cookie banners and converts them into editable components.</p>
+      </div>
+      <div class="card">
+        <h3>📤 Export</h3>
+        <p>Generates a clean output folder per language. Page metadata (title, description, OG tags, canonical) is injected automatically at export.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Get Started -->
+  <section id="get-started">
+    <h2>Quick Start</h2>
+
+    <h3>Browser Mode — No Installation Required</h3>
+    <pre><code># Clone the repository
+git clone https://github.com/yukishama9/PageMosaic.git
+cd PageMosaic
+
+# Windows — double-click start.bat, or run:
+start.bat
+
+# macOS / Linux:
+python3 -m http.server 8765
+# Open http://localhost:8765/builder/ in your browser</code></pre>
+
+    <h3>Desktop App (Electron)</h3>
+    <pre><code># Install dependencies
+npm install
+
+# Run in development mode (with DevTools)
+npm run dev
+
+# Run normally
+npm start</code></pre>
+
+    <p>On first launch, click <strong>Set</strong> next to <strong>Projects folder</strong> and <strong>Releases folder</strong> to configure where your work is stored. This is remembered across sessions.</p>
+  </section>
+
+  <!-- CSS Modes -->
+  <section id="css-modes">
+    <h2>CSS Modes</h2>
+    <p>Configurable per project in <strong>Project Settings</strong>:</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Mode</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Tailwind CDN</strong></td>
+          <td>Tailwind loaded from CDN. Theme config injected as a <code>&lt;script&gt;</code> block at runtime. Zero setup.</td>
+        </tr>
+        <tr>
+          <td><strong>Tailwind Local</strong></td>
+          <td>Uses a locally compiled <code>assets/css/tailwind.css</code>. In Electron mode, saving the Theme Editor auto-runs <code>npx tailwindcss</code>.</td>
+        </tr>
+        <tr>
+          <td><strong>Custom CSS</strong></td>
+          <td>No Tailwind. Theme Editor is disabled. Manage your own stylesheets directly — any framework or hand-written CSS.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Why -->
+  <section>
+    <h2>Why PageMosaic?</h2>
+    <ul class="why-list">
+      <li><span><strong>No framework. No build step.</strong> Pure HTML files you own completely.</span></li>
+      <li><span><strong>Lightweight &amp; portable.</strong> Runs as a desktop app or directly in the browser.</span></li>
+      <li><span><strong>Component reusability.</strong> Edit once, sync everywhere. Consistent UI across all pages.</span></li>
+      <li><span><strong>Multi-language ready.</strong> Built-in i18n — no manual translation duplication.</span></li>
+      <li><span><strong>Visual theme control.</strong> Adjust colors, fonts, and shapes without touching code.</span></li>
+    </ul>
+  </section>
+
+</main>
+
+<!-- Support CTA -->
+<section style="
+  background: linear-gradient(135deg, #1a1a2e 0%, #131320 100%);
+  border-top: 1px solid #2a2a36;
+  border-bottom: 1px solid #2a2a36;
+  padding: 4rem 2rem;
+  text-align: center;
+">
+  <div style="max-width: 560px; margin: 0 auto;">
+    <p style="font-size: 1.75rem; margin-bottom: .5rem;">☕</p>
+    <h2 style="font-size: 1.5rem; font-weight: 700; color: #e5e2e1; margin-bottom: .75rem;">Support This Project</h2>
+    <p style="color: #a8a5a0; font-size: .975rem; line-height: 1.8; margin-bottom: 2rem;">
+      PageMosaic is free and open-source. If it saves you time or inspires your work,
+      consider showing some support — it means a lot.
+    </p>
+    <a href="https://yukishama9.github.io/Helios-Blog/"
+       target="_blank"
+       rel="noopener noreferrer"
+       style="
+         display: inline-block;
+         background: #e9c176;
+         color: #0d0d18;
+         font-weight: 700;
+         font-size: 1rem;
+         padding: .875rem 2.25rem;
+         border-radius: 8px;
+         text-decoration: none;
+         transition: background .2s, transform .2s;
+         letter-spacing: .01em;
+       "
+       onmouseover="this.style.background='#d4a843';this.style.transform='translateY(-2px)'"
+       onmouseout="this.style.background='#e9c176';this.style.transform='translateY(0)'">
+      ☕ Buy me a coffee
+    </a>
+  </div>
+</section>
+
+<footer>
+  <p>
+    &copy; 2026&ndash;{{ 'now' | date: '%Y' }} PageMosaic &mdash; Licensed under
+    <a href="{{ site.repository }}/blob/main/LICENSE">MIT</a>
+  </p>
+  <p>
+    <a href="{{ site.repository }}">GitHub</a>
+    &mdash; Created by {{ site.author }}
+  </p>
+</footer>
+
+</body>
+</html>

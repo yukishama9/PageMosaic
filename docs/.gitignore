@@ -1,0 +1,10 @@
+_site/
+.jekyll-cache/
+.jekyll-metadata
+.bundle/
+Gemfile.lock
+.DS_Store
+Thumbs.db
+
+# Post templates (local use only, not published)
+page-templates/

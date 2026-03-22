@@ -1,0 +1,29 @@
+# Site metadata
+title: PageMosaic
+description: Visual static-site editor — edit reusable components once, sync across every page, manage multi-language content
+author: Helios Shen
+repository: https://github.com/yukishama9/PageMosaic
+url: https://yukishama9.github.io/PageMosaic
+
+# GitHub Pages settings
+markdown: kramdown
+kramdown:
+  input: GFM
+  hard_wrap: false
+
+# Pagination (jekyll-paginate — GitHub Pages native)
+paginate: 6
+paginate_path: "/blog/page:num/"
+plugins:
+  - jekyll-paginate
+
+# No theme — using custom _layouts/
+
+# Timezone
+timezone: Asia/Hong_Kong
+
+# Exclude from build
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - page-templates/
