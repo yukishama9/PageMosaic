@@ -60,7 +60,7 @@ npm start          # run normally
 npm run dev        # run with DevTools
 ```
 
-📖 **[Full Getting Started Guide](https://yukishama9.github.io/PageMosaic/getting-started/)** — step-by-step walkthrough with screenshots
+📖 **[Full Getting Started Guide](https://yukishama9.github.io/PageMosaic/tutorial/)** — step-by-step walkthrough with screenshots
 
 ---
 

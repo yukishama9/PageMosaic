@@ -27,7 +27,7 @@ And if you care about **open-source software** — tools that are transparent, c
 ## What you can do right now
 
 - 📥 **[Download the latest release](https://github.com/yukishama9/PageMosaic/releases)** — available for Windows, macOS, and Linux
-- 📖 **[Read the Getting Started guide](/PageMosaic/getting-started/)** — up and running in under 5 minutes
+- 📖 **[Read the Getting Started guide](/PageMosaic/tutorial/)** — up and running in under 5 minutes
 - ⭐ **[Star on GitHub](https://github.com/yukishama9/PageMosaic)** — it helps more people discover the project
 
 If PageMosaic solves a problem you've had, I'd love to hear about it. And if it helps you ship something — that's the whole point.
