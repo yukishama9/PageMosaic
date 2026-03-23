@@ -75,6 +75,9 @@ const App = {
 
     const srLabel = document.getElementById('sidebar-releases-status');
     if (srLabel) srLabel.textContent = releasesName ? `Releases: ${releasesName}` : 'Releases: not set';
+
+    // App Settings modal (live-update if open)
+    if (typeof UI !== 'undefined') UI.populateAppSettings();
   },
 
   // ── Welcome screen: render recent projects list ────────────────────────────────
@@ -476,6 +479,44 @@ const App = {
     }
 
     await Exporter.run(langs);
+  },
+
+  // ── App Settings (global — workspace paths) ────────────────────────────────────
+  showAppSettings() {
+    UI.populateAppSettings();
+    UI.openModal('modal-app-settings');
+  },
+
+  async reauthorizeProjectsFolder() {
+    const h = State.workspaceProjectsHandle;
+    if (!h) { Utils.showToast('No projects folder configured.', 'error'); return; }
+    try {
+      const perm = await h.requestPermission({ mode: 'readwrite' });
+      if (perm === 'granted') {
+        await this._updateWorkspaceStatus();
+        Utils.showToast('Projects folder re-authorized.', 'info');
+      } else {
+        Utils.showToast('Permission denied.', 'error');
+      }
+    } catch (e) {
+      Utils.showToast('Re-authorization failed: ' + (e.message || e), 'error');
+    }
+  },
+
+  async reauthorizeReleasesFolder() {
+    const h = State.workspaceReleasesHandle;
+    if (!h) { Utils.showToast('No releases folder configured.', 'error'); return; }
+    try {
+      const perm = await h.requestPermission({ mode: 'readwrite' });
+      if (perm === 'granted') {
+        await this._updateWorkspaceStatus();
+        Utils.showToast('Releases folder re-authorized.', 'info');
+      } else {
+        Utils.showToast('Permission denied.', 'error');
+      }
+    } catch (e) {
+      Utils.showToast('Re-authorization failed: ' + (e.message || e), 'error');
+    }
   },
 
   // ── Settings ───────────────────────────────────────────────────────────────────

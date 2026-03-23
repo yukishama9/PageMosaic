@@ -155,6 +155,11 @@ ipcMain.handle('shell:showInFolder', async (_event, targetPath) => {
   shell.showItemInFolder(targetPath);
 });
 
+// Return the absolute path to the built-in AI skills/agents directory
+ipcMain.handle('app:getResourcesPath', () => {
+  return path.join(__dirname, '../builder/builtin');
+});
+
 // ── Tailwind CSS compilation ──────────────────────────────────────────────────
 // Writes tailwind.config.js to dirPath, then runs:
 //   npx tailwindcss -i input.css -o assets/css/tailwind.css

@@ -249,6 +249,45 @@ const UI = {
     document.getElementById('btn-run-export').disabled = true;
   },
 
+  // ── App Settings modal (global workspace paths) ───────────────────────────────
+  populateAppSettings() {
+    const ph = State.workspaceProjectsHandle;
+    const rh = State.workspaceReleasesHandle;
+
+    const pEl  = document.getElementById('appsettings-projects-path');
+    const rEl  = document.getElementById('appsettings-releases-path');
+    const prEl = document.getElementById('appsettings-projects-reauth');
+    const rrEl = document.getElementById('appsettings-releases-reauth');
+
+    if (pEl) {
+      const hasP = !!(ph?.name);
+      pEl.textContent = hasP ? ph.name : 'Not configured';
+      pEl.classList.toggle('appsettings-path-ok', hasP);
+    }
+    if (rEl) {
+      const hasR = !!(rh?.name);
+      rEl.textContent = hasR ? rh.name : 'Not configured';
+      rEl.classList.toggle('appsettings-path-ok', hasR);
+    }
+
+    // Check permission state for reauth banners
+    this._checkHandlePermission(ph).then(state => {
+      if (prEl) prEl.classList.toggle('hidden', state !== 'prompt');
+    });
+    this._checkHandlePermission(rh).then(state => {
+      if (rrEl) rrEl.classList.toggle('hidden', state !== 'prompt');
+    });
+  },
+
+  // Returns 'granted'|'prompt'|'none' for a FileSystemHandle (async)
+  async _checkHandlePermission(handle) {
+    if (!handle) return 'none';
+    try {
+      const state = await handle.queryPermission({ mode: 'readwrite' });
+      return state; // 'granted' | 'prompt' | 'denied'
+    } catch { return 'none'; }
+  },
+
   // ── Settings modal ───────────────────────────────────────────────────────────
   populateSettings() {
     if (!State.project) return;

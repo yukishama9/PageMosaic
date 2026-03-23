@@ -50,4 +50,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Expose platform string so the renderer can adapt UI if needed
   platform: process.platform,
+
+  // Return the absolute path to the bundled resources/ directory
+  getResourcesPath: () => ipcRenderer.invoke('app:getResourcesPath'),
 });

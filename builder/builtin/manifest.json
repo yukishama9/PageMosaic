@@ -1,0 +1,13 @@
+{
+  "version": "1",
+  "skills": [
+    { "id": "html-cleanup",  "type": "folder", "path": "skills/html-cleanup" },
+    { "id": "html-consist",  "type": "folder", "path": "skills/html-consist" },
+    { "id": "html-copyright","type": "folder", "path": "skills/html-copyright" },
+    { "id": "html-img-dl",   "type": "folder", "path": "skills/html-img-dl" },
+    { "id": "html-localcss", "type": "folder", "path": "skills/html-localcss" }
+  ],
+  "agents": [
+    { "id": "webdev-guide", "type": "md", "path": "agents/webdev-guide.agent.md" }
+  ]
+}

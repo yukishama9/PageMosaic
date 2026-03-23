@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<!--
+  ╔══════════════════════════════════════════════════════════════════╗
+  ║   WebBuilder — Component Marker Template                        ║
+  ║   复制此文件作为新网站每个页面的起点，或参照标记规范手动添加    ║
+  ║   到已有 HTML 文件中。                                          ║
+  ╚══════════════════════════════════════════════════════════════════╝
+
+  标记语法
+  ─────────
+  <!-- @component:ID -->   ← 组件开始，紧贴最外层元素之前
+    ...HTML 内容...
+  <!-- /@component:ID -->  ← 组件结束，紧贴最外层元素之后
+
+  标准骨架顺序
+  ─────────────
+  <body>
+    <!-- @component:navbar -->  <header>...</header>  <!-- /@component:navbar -->
+    <main>...页面独有内容...</main>
+    <!-- @component:footer -->  <footer>...</footer>  <!-- /@component:footer -->
+    <!-- @component:cookie-banner -->  <div>...</div><script>...</script>  <!-- /@component:cookie-banner -->
+  </body>
+
+  WebBuilder 同步规则
+  ───────────────────
+  - 编辑组件后点击 "Sync to Pages"，所有含该 ID 标记的页面自动更新
+  - 标记 ID 区分大小写，必须与 WebBuilder Component ID 完全一致
+  - 标记之间不能嵌套另一个 @component 标记
+
+  详细规范：见 references/COMPONENT-GUIDE.md
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Page Title — Site Name</title>
+
+  <!-- @meta:managed
+       以下 SEO metadata 由 WebBuilder Page Metadata 面板管理，导出时自动注入：
+       - <title>
+       - <meta name="description">
+       - <meta property="og:title">
+       - <meta property="og:description">
+       - <meta property="og:image">
+       - <link rel="canonical">
+       在 WebBuilder 中打开此页面，展开 "Page Metadata" 面板填写上述字段。
+       ⚠️ 请勿在此区域手动添加上述标签，它们会在 Export 时自动注入。
+  -->
+
+  <!-- 样式表路径（使用 html-cleanup Skill 整理后为 assets/css/style.css） -->
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+  COMPONENT: navbar
+  ─────────────────────────────────────────────────────────────
+  内容：Logo / 主菜单 / 语言切换 / CTA 按钮
+  WebBuilder 共享数据：main-menu, languages
+  识别选择器：header, nav, [class*="navbar"], [class*="header"]
+  标记位置：<body> 之后第一个，包裹完整的 <header> 或顶层 <nav>
+════════════════════════════════════════════════════════════ -->
+<!-- @component:navbar -->
+<header class="site-header">
+  <nav class="navbar">
+
+    <!-- Logo
+         可替换为 <img src="assets/images/logo.svg" alt="Site Name">
+         WebBuilder 字段：field:logo_href, field:logo_text -->
+    <a href="index.html" class="nav-logo">SITE NAME</a>
+
+    <!-- Main Menu
+         WebBuilder 共享数据 ID: main-menu
+         链接文本通过 i18n 管理（key: nav.home, nav.about 等）
+         href 为相对路径，指向实际 HTML 文件 -->
+    <ul class="nav-links">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="about.html">About</a></li>
+      <li><a href="services.html">Services</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+
+    <!-- Language Switcher
+         WebBuilder 共享数据 ID: languages
+         pathPrefix 指向语言子文件夹，基础语言（en）无前缀
+         display 为语言切换器中显示的短名（EN, 简, 繁 等） -->
+    <div class="nav-lang">
+      <a href="index.html" class="lang-btn lang-active" title="English">EN</a>
+      <a href="zh-SC/index.html" class="lang-btn" title="简体中文">简</a>
+      <!-- 按需添加更多语言 -->
+    </div>
+
+    <!-- CTA Button（可选）
+         WebBuilder i18n key: nav.cta
+         WebBuilder 字段：field:cta_href -->
+    <a href="contact.html" class="nav-cta btn-primary">Contact Us</a>
+
+    <!-- Mobile Hamburger（可选，静态 HTML 需配合 JS） -->
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+
+  </nav>
+</header>
+<!-- /@component:navbar -->
+
+
+<!-- ═══════════════════════════════════════════════════════════
+  PAGE-SPECIFIC CONTENT
+  ─────────────────────────────────────────────────────────────
+  此 <main> 区域是每个页面独有的内容
+  不属于任何组件，Sync to Pages 时不受影响
+  如果导入的 HTML 没有 <main>，html-cleanup Skill 会自动添加
+════════════════════════════════════════════════════════════ -->
+<main>
+
+  <!-- Hero Section（首页示例） -->
+  <section class="hero">
+    <h1>Page Heading</h1>
+    <p>Page-specific intro text goes here.</p>
+    <a href="contact.html" class="btn-primary">Get Started</a>
+  </section>
+
+  <!-- 其他页面独有内容区块放在这里 -->
+
+</main>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+  COMPONENT: footer
+  ─────────────────────────────────────────────────────────────
+  内容：Logo / 导航链接 / 社交图标 / 版权声明
+  WebBuilder 共享数据：main-menu, social-links
+  识别选择器：footer, [class*="footer"], [id*="footer"]
+  标记位置：</main> 之后
+  ⚠️ 不要放在 <main> 内部
+════════════════════════════════════════════════════════════ -->
+<!-- @component:footer -->
+<footer class="site-footer">
+
+  <!-- Footer Logo / Brand -->
+  <div class="footer-brand">
+    <a href="index.html" class="footer-logo">SITE NAME</a>
+    <p class="footer-tagline">Your company tagline here.</p>
+  </div>
+
+  <!-- Footer Navigation Links
+       WebBuilder 共享数据 ID: main-menu（与顶栏共用）
+       或创建独立的 footer-menu 以使用不同的链接集合 -->
+  <nav class="footer-links" aria-label="Footer navigation">
+    <a href="index.html">Home</a>
+    <a href="about.html">About</a>
+    <a href="services.html">Services</a>
+    <a href="contact.html">Contact</a>
+    <a href="privacy.html">Privacy Policy</a>
+  </nav>
+
+  <!-- Social Links
+       WebBuilder 共享数据 ID: social-links
+       ──────────────────────────────────────
+       SVG 规范（必须遵守）：
+         ✅ <a> 必须有 title 和 aria-label（WebBuilder 识别 + 无障碍）
+         ✅ SVG 使用 fill="currentColor"（颜色由 CSS color 属性控制）
+         ✅ width/height 明确（建议 20 或 24）
+         ✅ href 为完整 URL（含 https://）
+         ℹ️  SVG path 来源推荐：https://simpleicons.org
+       ────────────────────────────────────── -->
+  <div class="footer-social">
+
+    <a href="https://twitter.com/yourhandle" title="Twitter" aria-label="Twitter">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+      </svg>
+    </a>
+
+    <a href="https://instagram.com/yourhandle" title="Instagram" aria-label="Instagram">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+      </svg>
+    </a>
+
+    <a href="https://linkedin.com/company/yourcompany" title="LinkedIn" aria-label="LinkedIn">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+      </svg>
+    </a>
+
+    <a href="https://facebook.com/yourpage" title="Facebook" aria-label="Facebook">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+      </svg>
+    </a>
+
+    <a href="https://youtube.com/@yourchannel" title="YouTube" aria-label="YouTube">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+      </svg>
+    </a>
+
+    <!-- 解注释以启用 GitHub 图标 -->
+    <!--
+    <a href="https://github.com/yourhandle" title="GitHub" aria-label="GitHub">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+      </svg>
+    </a>
+    -->
+
+    <!-- 如需添加更多平台，从 https://simpleicons.org 获取 SVG path
+         格式：<a href="https://platform.com/handle" title="Platform" aria-label="Platform">
+                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                   <path d="..."/>
+                 </svg>
+               </a> -->
+
+  </div>
+
+  <!-- Copyright
+       WebBuilder i18n key: footer.copyright
+       <span id="footer-year"> 可用 JS 动态更新年份 -->
+  <p class="footer-copy">
+    &copy; <span id="footer-year">2025</span> Site Name. All rights reserved.
+  </p>
+
+</footer>
+<!-- /@component:footer -->
+
+
+<!-- ═══════════════════════════════════════════════════════════
+  COMPONENT: cookie-banner
+  ─────────────────────────────────────────────────────────────
+  内容：标题 / 描述文字 / Accept & Decline 按钮 / 内联 JS
+  识别选择器：[id*="cookie"], [class*="cookie"], [class*="consent"], [class*="gdpr"]
+  标记位置：</footer> 之后，</body> 之前
+  ⚠️  不要放在 <main> 或 <footer> 内部
+  ⚠️  标记范围必须包含紧随弹窗 <div> 之后的 <script> 块
+════════════════════════════════════════════════════════════ -->
+<!-- @component:cookie-banner -->
+<div class="cookie-banner" id="cookie-consent" role="dialog" aria-label="Cookie notice" aria-live="polite">
+  <div class="cookie-content">
+
+    <!-- WebBuilder i18n key: cookie.title -->
+    <h3 class="cookie-title">Cookie Notice</h3>
+
+    <!-- WebBuilder i18n key: cookie.desc -->
+    <p class="cookie-desc">
+      We use cookies to enhance your browsing experience, analyse site traffic,
+      and personalise content. By clicking "Accept", you consent to our use of cookies.
+    </p>
+
+    <div class="cookie-actions">
+      <!-- WebBuilder i18n key: cookie.decline -->
+      <button class="btn-cookie-decline" id="decline-cookies">Decline</button>
+      <!-- WebBuilder i18n key: cookie.accept -->
+      <button class="btn-cookie-accept" id="accept-cookies">Accept</button>
+    </div>
+
+    <!-- WebBuilder i18n key: cookie.privacyLink（可选） -->
+    <a href="privacy.html" class="cookie-privacy-link">Privacy Policy</a>
+
+  </div>
+</div>
+
+<script>
+/* Cookie Banner — 无需引入任何依赖库 */
+(function () {
+  var banner = document.getElementById('cookie-consent');
+  if (!banner) return;
+
+  /* 已做过选择 → 立即隐藏，不显示弹窗 */
+  if (localStorage.getItem('wb-cookie-choice')) {
+    banner.style.display = 'none';
+    return;
+  }
+
+  var acceptBtn  = document.getElementById('accept-cookies');
+  var declineBtn = document.getElementById('decline-cookies');
+
+  if (acceptBtn) {
+    acceptBtn.addEventListener('click', function () {
+      localStorage.setItem('wb-cookie-choice', 'accepted');
+      banner.style.display = 'none';
+    });
+  }
+
+  if (declineBtn) {
+    declineBtn.addEventListener('click', function () {
+      localStorage.setItem('wb-cookie-choice', 'declined');
+      banner.style.display = 'none';
+    });
+  }
+})();
+</script>
+<!-- /@component:cookie-banner -->
+
+</body>
+</html>

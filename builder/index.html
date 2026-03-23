@@ -53,11 +53,16 @@
       <span class="material-symbols-outlined">publish</span>
       <span>Export</span>
     </button>
-    <button class="btn-topbar" onclick="App.showSettings()" title="Project settings">
+    <button class="btn-topbar" onclick="App.showAppSettings()" title="App settings">
       <span class="material-symbols-outlined">settings</span>
     </button>
     <button class="btn-topbar" onclick="App.closeProject()" title="Close project">
       <span class="material-symbols-outlined">close</span>
+    </button>
+    <div class="topbar-divider"></div>
+    <button class="btn-topbar btn-topbar--ai" id="btn-ai-toggle" onclick="AiChat.toggle()" title="AI Assistant (Ctrl+Shift+A)">
+      <span class="material-symbols-outlined">smart_toy</span>
+      <span>AI</span>
     </button>
   </div>
 </header>
@@ -177,6 +182,14 @@
         </div>
       </div>
 
+      <!-- Project Settings footer (only visible when project is open) -->
+      <div class="sidebar-project-footer">
+        <button class="sidebar-footer-btn" onclick="App.showSettings()">
+          <span class="material-symbols-outlined" style="font-size:13px">tune</span>
+          Project Settings
+        </button>
+      </div>
+
     </div><!-- /sidebar-project -->
   </aside>
 
@@ -229,6 +242,9 @@
         </button>
         <button class="toolbar-btn" onclick="PageEditor.insertComponent()" title="Insert component">
           <span class="material-symbols-outlined">add_box</span>
+        </button>
+        <button class="toolbar-btn btn-ai-quick" onclick="AiChat.showQuickMenu(this)" title="AI Quick Actions">
+          <span class="material-symbols-outlined">auto_awesome</span>
         </button>
         <button class="toolbar-btn btn-save" onclick="PageEditor.save()" title="Save (Ctrl+S)">
           <span class="material-symbols-outlined">save</span>
@@ -321,6 +337,9 @@
         <span id="comp-editor-name" class="toolbar-filename"></span>
         <span id="comp-dirty-dot" class="dirty-dot hidden">●</span>
         <div class="toolbar-spacer"></div>
+        <button class="toolbar-btn btn-ai-quick" onclick="AiChat.showQuickMenu(this)" title="AI Quick Actions">
+          <span class="material-symbols-outlined">auto_awesome</span>
+        </button>
         <button class="toolbar-btn btn-sync" id="btn-sync-comp" onclick="App.syncComponentToPages()" title="Sync this component to all pages that use it">
           <span class="material-symbols-outlined">sync</span>
           <span>Sync to Pages</span>
@@ -627,6 +646,93 @@
     </div>
 
   </main>
+  <!-- ── AI PANEL ── -->
+  <aside id="ai-panel" class="ai-panel ai-panel--closed">
+
+    <!-- Header Row -->
+    <div class="ai-panel-header">
+      <span class="material-symbols-outlined" style="font-size:15px;color:#6366f1;flex-shrink:0">smart_toy</span>
+      <span id="ai-panel-conv-title" class="ai-panel-header-title">AI Assistant</span>
+      <div class="ai-panel-header-actions">
+        <button class="ai-icon-btn" onclick="AiChat.newConversation()" title="New conversation">
+          <span class="material-symbols-outlined">add</span>
+        </button>
+        <button class="ai-icon-btn" onclick="AiChat.close()" title="Close (Ctrl+Shift+A)">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Tab Bar -->
+    <div class="ai-tabs">
+      <button class="ai-tab-btn active" data-tab="chat" onclick="AiChat.switchTab('chat')">
+        <span class="material-symbols-outlined">chat</span>Chat
+      </button>
+      <button class="ai-tab-btn" data-tab="history" onclick="AiChat.switchTab('history')">
+        <span class="material-symbols-outlined">history</span>History
+      </button>
+      <button class="ai-tab-btn" data-tab="settings" onclick="AiChat.switchTab('settings')">
+        <span class="material-symbols-outlined">settings</span>Settings
+      </button>
+    </div>
+
+    <!-- Chat pane -->
+    <div class="ai-tab-pane" data-pane="chat" style="display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden">
+      <!-- Messages -->
+      <div id="ai-messages" class="ai-messages"></div>
+
+      <!-- Input area — P7.1 redesign -->
+      <div class="ai-input-area">
+        <textarea id="ai-input" class="ai-input" placeholder="Ask AI… (Enter to send, Shift+Enter for newline)"
+          rows="3"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();AiChat._sendFromInput()}"
+        ></textarea>
+
+        <!-- Row 1: model select + Plan/Act + Send -->
+        <div class="ai-input-row ai-input-row--main">
+          <select id="ai-model-select" class="ai-model-select" onchange="AiChat.setModelQuick(this.value)" title="Switch model"></select>
+          <div class="ai-mode-toggle" id="ai-mode-toggle" title="Plan: AI analyses and plans only. Act: AI produces executable code.">
+            <button class="ai-mode-btn" data-mode="plan" onclick="AiChat.setMode('plan')">Plan</button>
+            <button class="ai-mode-btn active" data-mode="act" onclick="AiChat.setMode('act')">Act</button>
+          </div>
+          <button id="ai-send-btn" class="ai-send-btn" onclick="AiChat._sendFromInput()" title="Send (Enter)">
+            <span class="material-symbols-outlined">send</span>
+          </button>
+        </div>
+
+        <!-- Row 2: Skill + Agent -->
+        <div class="ai-input-row ai-input-row--tools">
+          <div class="ai-tool-select-wrap">
+            <span class="material-symbols-outlined ai-tool-icon">extension</span>
+            <select id="ai-skill-select" class="ai-tool-select" onchange="AiChat.setSkill(this.value)" title="Active Skill">
+              <option value="">No Skill</option>
+            </select>
+          </div>
+          <div class="ai-tool-select-wrap">
+            <span class="material-symbols-outlined ai-tool-icon">smart_toy</span>
+            <select id="ai-agent-select" class="ai-tool-select" onchange="AiChat.setAgent(this.value)" title="Active Agent">
+              <option value="">Default Agent</option>
+            </select>
+          </div>
+          <button class="ai-tool-manage-btn" onclick="AiChat.switchTab('settings')" title="Manage skills &amp; agents">
+            <span class="material-symbols-outlined">tune</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- History pane -->
+    <div class="ai-tab-pane hidden" data-pane="history" style="flex:1;overflow-y:auto">
+      <div id="ai-history-pane"></div>
+    </div>
+
+    <!-- Settings pane -->
+    <div class="ai-tab-pane hidden" data-pane="settings" style="flex:1;overflow-y:auto;padding:12px">
+      <div id="ai-settings-pane"></div>
+    </div>
+
+  </aside>
+
 </div><!-- /app-body -->
 
 <!-- ═══════════════════════════════════════════════════════════
@@ -987,21 +1093,6 @@
         <input id="settings-canonical-base" type="url" placeholder="https://example.com (optional)">
         <small>Used for absolute <code style="color:#6366f1">hreflang</code> and canonical link tags in exported pages. Leave empty to use relative paths.</small>
       </div>
-      <div style="border-top:1px solid #111118;margin:16px 0 12px"></div>
-      <div class="form-field">
-        <label>Projects folder</label>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span id="settings-projects-path" style="flex:1;font-size:12px;color:#aaa;background:#0d0d18;padding:5px 10px;border-radius:4px;border:1px solid #1a1a2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Not configured</span>
-          <button class="btn-sm" style="width:auto" onclick="App.pickProjectsFolder()">Change</button>
-        </div>
-      </div>
-      <div class="form-field">
-        <label>Releases folder</label>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span id="settings-releases-path" style="flex:1;font-size:12px;color:#aaa;background:#0d0d18;padding:5px 10px;border-radius:4px;border:1px solid #1a1a2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Not configured</span>
-          <button class="btn-sm" style="width:auto" onclick="App.pickReleasesFolder()">Change</button>
-        </div>
-      </div>
     </div>
     <div class="modal-footer">
       <button class="btn-secondary" onclick="UI.closeModal('modal-settings')">Cancel</button>
@@ -1061,6 +1152,64 @@
   </div>
 </div>
 
+<!-- Modal: App Settings (global, not project-specific) -->
+<div id="modal-app-settings" class="modal-backdrop hidden">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <span class="modal-title">
+        <span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;color:#818cf8">settings</span>
+        App Settings
+      </span>
+      <button class="modal-close" onclick="UI.closeModal('modal-app-settings')">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <!-- Workspace Folders -->
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555;margin-bottom:8px;display:flex;align-items:center;gap:5px">
+        <span class="material-symbols-outlined" style="font-size:13px">folder_open</span>
+        Workspace Folders
+      </div>
+      <p style="font-size:11px;color:#444;margin-bottom:14px;line-height:1.6">
+        These paths are saved globally across all projects. Browser permission may expire between sessions — click <strong style="color:#888">Re-authorize</strong> to restore access without re-picking the folder.
+      </p>
+      <div class="form-field">
+        <label>Projects folder</label>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="appsettings-projects-path" class="appsettings-path-display">Not configured</span>
+          <button class="btn-sm" style="width:auto;flex-shrink:0" onclick="App.pickProjectsFolder()">
+            <span class="material-symbols-outlined" style="font-size:13px">folder</span>
+            Set
+          </button>
+        </div>
+        <div id="appsettings-projects-reauth" class="appsettings-reauth-row hidden">
+          <span class="material-symbols-outlined" style="font-size:12px;color:#f97316">lock</span>
+          <span style="font-size:10px;color:#f97316;flex:1">Permission expired</span>
+          <button class="btn-sm" style="width:auto;flex-shrink:0" onclick="App.reauthorizeProjectsFolder()">Re-authorize</button>
+        </div>
+      </div>
+      <div class="form-field">
+        <label>Releases folder</label>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="appsettings-releases-path" class="appsettings-path-display">Not configured</span>
+          <button class="btn-sm" style="width:auto;flex-shrink:0" onclick="App.pickReleasesFolder()">
+            <span class="material-symbols-outlined" style="font-size:13px">folder</span>
+            Set
+          </button>
+        </div>
+        <div id="appsettings-releases-reauth" class="appsettings-reauth-row hidden">
+          <span class="material-symbols-outlined" style="font-size:12px;color:#f97316">lock</span>
+          <span style="font-size:10px;color:#f97316;flex:1">Permission expired</span>
+          <button class="btn-sm" style="width:auto;flex-shrink:0" onclick="App.reauthorizeReleasesFolder()">Re-authorize</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="UI.closeModal('modal-app-settings')">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- Scripts -->
 <script src="js/wb-core.js"></script>
 <script src="js/wb-project.js"></script>
@@ -1068,5 +1217,18 @@
 <script src="js/wb-editors.js"></script>
 <script src="js/wb-preview.js"></script>
 <script src="js/wb-app.js"></script>
+<script src="js/wb-ai-provider.js"></script>
+<script src="builtin/builtin-data.js"></script>
+<script src="js/wb-ai-chat.js"></script>
+<script>
+  // Initialize AI panel after DOM is ready
+  document.addEventListener('DOMContentLoaded', () => {
+    AiChat.init().then(() => {
+      // Update model badge
+      const badge = document.getElementById('ai-model-badge');
+      if (badge) badge.textContent = AiProvider.config.model || '';
+    });
+  });
+</script>
 </body>
 </html>

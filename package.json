@@ -10,6 +10,8 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
+    "serve": "node scripts/serve.js",
+    "build:builtin": "node scripts/build-builtin-data.js",
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish"
