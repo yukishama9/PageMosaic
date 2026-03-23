@@ -117,6 +117,9 @@ const AiChat = {
   _autoScroll: true,
   _pendingImages: [],    // P5 — images staged for next send
   _mode: 'act',          // P7 — 'plan' | 'act'
+  _thinkingTimer: null,  // timer for thinking seconds counter
+  _thinkingStart: 0,     // timestamp when thinking started
+  _hasFirstToken: false, // whether first token arrived in current stream
   _activeSkill: '',      // P7.1 — active skill id
   _activeAgent: '',      // P7.1 — active agent id
   _skills: [],           // loaded from IDB
@@ -140,6 +143,18 @@ const AiChat = {
         this.toggle();
       }
     });
+
+    // Persistent delegated click handler for welcome suggestion buttons
+    const msgContainer = document.getElementById('ai-messages');
+    if (msgContainer) {
+      msgContainer.addEventListener('click', (e) => {
+        const btn = e.target.closest('.ai-suggestion-btn');
+        if (!btn) return;
+        const idx = parseInt(btn.dataset.suggestionIdx, 10);
+        const s = this._welcomeSuggestions?.[idx];
+        if (s) this.send(s.prompt);
+      });
+    }
 
     // P4 — panel resize + textarea auto-grow
     this._initResize();
@@ -259,7 +274,7 @@ const AiChat = {
       lastUserMsg,
     ];
 
-    this._abortCtrl = AiProvider.chat(apiMessages, {
+    this._abortCtrl = AiProvider.chatWithMode(this._mode, apiMessages, {
       onToken: (token) => {
         this._streamingText += token;
         this._updateStreamingBubble(this._streamingText);
@@ -294,39 +309,106 @@ const AiChat = {
 
   // ── System prompt ─────────────────────────────────────────────────────────────
   _buildSystemPrompt() {
-    const parts = [
-      'You are an AI assistant integrated into PageMosaic, a visual static-site editor.',
-      'You help users with HTML editing, CSS styling, component design, i18n translations, and web development tasks.',
-    ];
+    const parts = [];
 
+    // ── Core identity ──────────────────────────────────────────────────────────
+    parts.push(
+`You are the AI assistant built into **PageMosaic** — a visual static-site editor for building multilingual, SEO-optimised HTML websites.
+You help users with HTML editing, Tailwind CSS styling, component authoring, i18n translations, theme design, and export preparation.
+Always produce clean, semantic, accessible HTML. Prefer Tailwind CSS utility classes over custom CSS.`
+    );
+
+    // ── PageMosaic system knowledge ────────────────────────────────────────────
+    parts.push(
+`## PageMosaic System — Template Syntax & Component Markers
+
+### Component Markers
+Pages use HTML comment markers to denote shared components:
+\`\`\`html
+<!-- @component:ID -->
+  ... component HTML injected here at preview/export time ...
+<!-- /@component:ID -->
+\`\`\`
+Standard component IDs: \`navbar\` · \`footer\` · \`cookie-banner\`
+Correct page skeleton order: navbar → <main> → footer → cookie-banner (before </body>)
+
+### Template Tokens (resolved at preview & export)
+| Token | Meaning |
+|---|---|
+| \`{{t:i18n.key}}\` | Translated string from i18n database |
+| \`{{field:key}}\` | Component/page field value |
+| \`{{pageName}}\` | Current page filename (e.g. \`about.html\`) |
+| \`{{lang}}\` | Current language code (e.g. \`zh-SC\`) |
+| \`{{item.fieldKey}}\` | Field of current loop item |
+| \`{{t:item.i18nKey}}\` | Translated label of current loop item |
+
+### Shared Data Loops
+\`\`\`html
+<!-- @each:main-menu -->
+<a href="{{item.href}}">{{t:item.i18nKey}}</a>
+<!-- @/each -->
+\`\`\`
+Standard shared data IDs: \`main-menu\` (type: menu) · \`social-links\` (type: icon-links) · \`languages\` (type: languages)
+
+### i18n Keys — Common Defaults
+\`nav.home\` · \`nav.about\` · \`nav.services\` · \`nav.contact\` · \`nav.cta\`
+\`footer.copyright\` · \`cookie.title\` · \`cookie.desc\` · \`cookie.accept\` · \`cookie.decline\`
+
+### Page Metadata (managed via Page Editor panel, NOT hand-coded)
+PageMosaic injects title, description, og:title, og:description, og:image, canonical into \`</head>\` at export.
+Mark the managed zone with: \`<!-- @meta:managed -->\`
+Do NOT hardcode these tags in HTML; let PageMosaic manage them.
+
+### Export Structure
+Base language pages → project root. Other languages → \`/{lang-code}/\` subdirectory.
+hreflang \`<link>\` tags are auto-injected at export. Asset paths in lang subdirs are auto-prefixed with \`../\`.
+
+### CSS Modes
+- \`tailwind-cdn\` — Tailwind CDN script in \`<head>\`, theme config injected automatically
+- \`tailwind-local\` — pre-compiled \`assets/css/tailwind.css\`, recompile with CLI after theme changes
+- \`custom\` — bring your own CSS; Theme Editor does not apply
+
+### Theme Engine (tailwind-cdn / tailwind-local modes)
+5 seed colors → M3-style 40+ token palette: primary, primaryContainer, surface, onSurface, secondary.
+3 font roles: \`font-headline\` · \`font-body\` · \`font-label\`.
+3 radius presets: \`sharp\` · \`rounded\` · \`pill\`.
+Use Tailwind semantic color names: \`text-primary\`, \`bg-surface\`, \`text-on-surface\`, etc.
+
+### Head Code Injection
+Custom \`<head>\` snippets (analytics, pixels) are added via Project Settings → Head Code.
+They are injected only at export — NOT in preview. Do not suggest adding analytics directly to page HTML.
+
+### Output Rules for HTML Generation
+1. Always output **complete, valid HTML** — never truncate with "rest unchanged" comments.
+2. Preserve all \`<!-- @component:ID -->\` and \`<!-- /@component:ID -->\` marker pairs exactly.
+3. Use \`{{t:key}}\` for all user-visible text — never hardcode strings.
+4. Use Tailwind utility classes; avoid inline \`style=\` unless absolutely necessary.
+5. Social icon \`<a>\` tags must have \`title\` and \`aria-label\` attributes. SVGs must use \`fill="currentColor"\`.`
+    );
+
+    // ── Project context (injected when a project is loaded) ────────────────────
     if (State.project) {
-      parts.push(`\n## Current Project`);
-      parts.push(`Name: "${State.project.title || State.project.name}"`);
-      parts.push(`CSS mode: ${State.project.cssMode || 'tailwind-cdn'}`);
-
-      // Pages & components summary
-      const pages = State.pages || [];
-      if (pages.length) parts.push(`Pages: ${pages.map(p => p.file).join(', ')}`);
+      const proj = State.project;
+      const pages = (State.pages || []).map(p => p.file);
       const compIds = Object.keys(State.components || {});
-      if (compIds.length) parts.push(`Components: ${compIds.join(', ')}`);
+      const langs = (proj.languages || []).map(l => l.code);
+      const theme = proj.theme;
 
-      // Languages
-      const langs = (State.project.languages || []).map(l => l.code);
-      if (langs.length) parts.push(`Languages: ${langs.join(', ')}, base: ${State.project.baseLanguage || 'en'}`);
-
-      // Theme summary
-      const theme = State.project.theme;
-      if (theme) {
-        const cp = [];
-        if (theme.primaryColor) cp.push(`primary=${theme.primaryColor}`);
-        if (theme.accentColor)  cp.push(`accent=${theme.accentColor}`);
-        if (theme.bgColor)      cp.push(`bg=${theme.bgColor}`);
-        if (cp.length) parts.push(`Theme colors: ${cp.join(', ')}`);
-        if (theme.fontBody) parts.push(`Body font: ${theme.fontBody}`);
+      let ctx = `## Current Project: "${proj.title || proj.name}"`;
+      ctx += `\nCSS mode: ${proj.cssMode || 'tailwind-cdn'}`;
+      if (pages.length)   ctx += `\nPages: ${pages.join(', ')}`;
+      if (compIds.length) ctx += `\nComponents: ${compIds.join(', ')}`;
+      if (langs.length)   ctx += `\nLanguages: ${langs.join(', ')} (base: ${proj.baseLanguage || 'en'})`;
+      if (theme?.colors) {
+        const c = theme.colors;
+        ctx += `\nTheme colors — primary: ${c.primary||''}, surface: ${c.surface||''}, onSurface: ${c.onSurface||''}`;
       }
+      if (theme?.fonts)  ctx += `\nFonts — headline: ${theme.fonts.headline||''}, body: ${theme.fonts.body||''}, label: ${theme.fonts.label||''}`;
+      if (theme?.radius) ctx += `\nRadius: ${theme.radius}`;
+      parts.push(ctx);
     }
 
-    // Active editor context — inject current HTML (truncated)
+    // ── Active editor context ──────────────────────────────────────────────────
     if (State.activePage) {
       parts.push(`\n## Active Page: ${State.activePage}`);
       const html = State.pageCodeMirror?.getValue() || '';
@@ -411,7 +493,12 @@ const AiChat = {
       parts.push('- End your response with: "✅ Plan ready. Switch to **Act** mode to implement."');
     } else {
       parts.push('\n## Current Mode: ACT');
-      parts.push('You are in ACT mode. Provide complete, executable code and concrete solutions ready to apply directly.');
+      parts.push('You are in ACT mode. Your response will be AUTOMATICALLY APPLIED to the active HTML editor.');
+      parts.push('Rules:');
+      parts.push('- Output the COMPLETE updated HTML in ONE single fenced code block (```html ... ```)');
+      parts.push('- Do NOT split code across multiple blocks');
+      parts.push('- Do NOT omit sections with placeholder comments like "<!-- rest unchanged -->"');
+      parts.push('- A brief explanation before or after the code block is acceptable');
     }
 
     parts.push('\nRespond in the same language the user uses. Be concise and practical.');
@@ -467,13 +554,21 @@ const AiChat = {
     const suggestions = this._getContextSuggestions();
     const contextTag  = this._getContextTag();
 
+    // Store suggestions on the instance so the delegated click handler can look them up by index.
+    // This avoids embedding the prompt text directly in an HTML onclick attribute (quote-escaping bug).
+    this._welcomeSuggestions = suggestions;
+
+    const suggestionBtns = suggestions.map((s, i) =>
+      `<button class="ai-suggestion-btn" data-suggestion-idx="${i}">${Utils.escapeHtml(s.label)}</button>`
+    ).join('');
+
     return `<div class="ai-welcome">
       <span class="material-symbols-outlined" style="font-size:36px;color:#6366f1">smart_toy</span>
       <p style="color:#aaa;font-size:13px;margin-top:12px">AI Assistant</p>
       <p style="color:#555;font-size:11px;margin-top:4px">${prov?.name || ''} · ${AiProvider.config.model}</p>
       ${contextTag}
       <div class="ai-suggestions">
-        ${suggestions.map(s => `<button class="ai-suggestion-btn" onclick="AiChat.send(${JSON.stringify(s.prompt)})">${Utils.escapeHtml(s.label)}</button>`).join('')}
+        ${suggestionBtns}
       </div>
       <div class="ai-slash-hint">
         Tip: prefix with <code>/page</code> <code>/comp</code> <code>/i18n</code> to inject full context
@@ -544,14 +639,31 @@ const AiChat = {
         <span class="material-symbols-outlined">smart_toy</span>
       </div>
       <div class="ai-bubble-body">
-        <div class="ai-bubble-content ai-md ai-streaming-content"><span class="ai-cursor"></span></div>
+        <div class="ai-bubble-content ai-md ai-streaming-content">
+          <div class="ai-thinking">
+            <div class="ai-thinking-dots"><span></span><span></span><span></span></div>
+            <span class="ai-thinking-label">Thinking… <span class="ai-thinking-sec"></span></span>
+          </div>
+        </div>
       </div>`;
     container.appendChild(el);
     this._streamingMsgEl = el;
+    this._hasFirstToken = false;
+    this._thinkingStart = Date.now();
+    this._thinkingTimer = setInterval(() => {
+      const secEl = this._streamingMsgEl?.querySelector('.ai-thinking-sec');
+      if (secEl) secEl.textContent = Math.floor((Date.now() - this._thinkingStart) / 1000) + 's';
+    }, 1000);
   },
 
   _updateStreamingBubble(text) {
     if (!this._streamingMsgEl) return;
+    // Remove thinking indicator on first token
+    if (!this._hasFirstToken) {
+      this._hasFirstToken = true;
+      clearInterval(this._thinkingTimer);
+      this._thinkingTimer = null;
+    }
     const contentEl = this._streamingMsgEl.querySelector('.ai-streaming-content');
     if (contentEl) {
       contentEl.innerHTML = AiMarkdown.render(text) + '<span class="ai-cursor"></span>';
@@ -559,6 +671,7 @@ const AiChat = {
   },
 
   _finalizeStreamingBubble() {
+    if (this._thinkingTimer) { clearInterval(this._thinkingTimer); this._thinkingTimer = null; }
     if (!this._streamingMsgEl) return;
     const text = this._streamingText;
 
@@ -585,9 +698,29 @@ const AiChat = {
     this._streamingMsgEl = null;
     this._streamingText = '';
     this._updateTitle();
+
+    // Act mode: auto-apply first HTML code block to active editor
+    if (this._mode === 'act' && text.trim()) {
+      const m = text.match(/```(?:html)?\s*\n([\s\S]*?)```/i);
+      if (m) {
+        const code = m[1].trim();
+        if (State.activePage && State.pageCodeMirror) {
+          State.pageCodeMirror.setValue(code);
+          if (typeof UI !== 'undefined') UI.setDirty(`page:${State.activePage}`, true);
+          if (typeof Preview !== 'undefined') Preview.renderCurrentPage();
+          Utils.showToast(`✓ Applied to "${State.activePage}"`, 'info', 2500);
+        } else if (State.activeComponent && State.compCodeMirror) {
+          State.compCodeMirror.setValue(code);
+          if (typeof UI !== 'undefined') UI.setDirty(`comp:${State.activeComponent}`, true);
+          const lbl = State.components?.[State.activeComponent]?.meta?.label || State.activeComponent;
+          Utils.showToast(`✓ Applied to component "${lbl}"`, 'info', 2500);
+        }
+      }
+    }
   },
 
   _finalizeStreamingBubbleError(errMsg) {
+    if (this._thinkingTimer) { clearInterval(this._thinkingTimer); this._thinkingTimer = null; }
     if (!this._streamingMsgEl) return;
     this._streamingMsgEl.classList.remove('ai-bubble--streaming');
     this._streamingMsgEl.classList.add('ai-bubble--error');
@@ -1024,6 +1157,17 @@ const AiChat = {
     if (msg) this.send(msg);
   },
 
+  _sendImplement() {
+    const input = document.getElementById('ai-input');
+    const userText = input ? input.value.trim() : '';
+    if (userText) {
+      this.send(userText);
+    } else {
+      // No visible instruction — send a silent English directive the LLM will act on
+      this.send('Based on the plan above, now output the complete implementation code.');
+    }
+  },
+
   _focusInput() {
     setTimeout(() => document.getElementById('ai-input')?.focus(), 50);
   },
@@ -1136,7 +1280,8 @@ const AiChat = {
     document.addEventListener('mousemove', (e) => {
       if (!dragging) return;
       const delta = startX - e.clientX;
-      const newW = Math.max(280, Math.min(600, startW + delta));
+      const maxW = Math.min(900, Math.floor(window.innerWidth * 0.75));
+      const newW = Math.max(320, Math.min(maxW, startW + delta));
       panel.style.width = newW + 'px';
     });
     document.addEventListener('mouseup', async () => {
@@ -1147,7 +1292,7 @@ const AiChat = {
       await AiDB.set('config', 'ai-panel-width', panel.offsetWidth);
     });
     AiDB.get('config', 'ai-panel-width').then(w => {
-      if (w && w >= 280 && w <= 600) panel.style.width = w + 'px';
+      if (w && w >= 320 && w <= 900) panel.style.width = w + 'px';
     });
   },
 
@@ -1347,6 +1492,7 @@ const AiChat = {
 
   // ── P7 — Plan/Act mode ───────────────────────────────────────────────────────
   setMode(mode) {
+    const prevMode = this._mode;
     this._mode = mode;
     const panel = document.getElementById('ai-panel');
     if (panel) {
@@ -1363,6 +1509,29 @@ const AiChat = {
       const lbl = mode === 'plan' ? '🔵 Plan mode — AI will analyse and plan without writing full code.' : '⚡ Act mode — AI will produce complete, executable code.';
       Utils.showToast(lbl, 'info', 2500);
     }
+    // Plan → Act: show Act-mode banner on last assistant bubble (Cline-style, no auto-send)
+    if (prevMode === 'plan' && mode === 'act' && !this._streaming) {
+      const msgs = this._conv?.messages;
+      if (msgs?.length && msgs[msgs.length - 1].role === 'assistant') {
+        this._showActModeBanner();
+      }
+    }
+  },
+
+  _showActModeBanner() {
+    const bubbles = document.querySelectorAll('#ai-messages .ai-bubble--assistant');
+    if (!bubbles.length) return;
+    const last = bubbles[bubbles.length - 1];
+    last.querySelector('.ai-act-banner')?.remove();
+    const banner = document.createElement('div');
+    banner.className = 'ai-act-banner';
+    banner.innerHTML = `
+      <span class="material-symbols-outlined" style="font-size:13px;color:#f59e0b;flex-shrink:0">bolt</span>
+      <span>Switched to <strong>Act mode</strong> — AI will now write and apply code directly to your editor.</span>
+      <button class="ai-act-banner-btn" onclick="AiChat._sendImplement()">▶ Send to implement</button>
+    `;
+    last.querySelector('.ai-bubble-body')?.appendChild(banner);
+    last.scrollIntoView({ behavior: 'smooth', block: 'end' });
   },
 
   async _initMode() {

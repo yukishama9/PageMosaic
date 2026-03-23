@@ -8,6 +8,6 @@
     { "id": "html-localcss", "type": "folder", "path": "skills/html-localcss" }
   ],
   "agents": [
-    { "id": "webdev-guide", "type": "md", "path": "agents/webdev-guide.agent.md" }
+    { "id": "pagemosaic-webdev", "type": "md", "path": "agents/pagemosaic-webdev.agent.md" }
   ]
 }

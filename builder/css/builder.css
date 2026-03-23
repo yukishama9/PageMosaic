@@ -80,6 +80,7 @@ html, body {
   display: flex;
   height: calc(100vh - 40px);
   overflow: hidden;
+  position: relative;
 }
 
 /* ── Sidebar ──────────────────────────────────────────────────────────────── */
@@ -1291,23 +1292,26 @@ html, body {
 
 /* ── AI Panel shell ────────────────────────────────────────── */
 .ai-panel {
-  width: 340px;
-  min-width: 280px;
-  max-width: 480px;
-  flex-shrink: 0;
+  position: fixed;
+  top: 40px;              /* below topbar */
+  right: 0;
+  bottom: 0;
+  width: 420px;
+  min-width: 320px;
+  max-width: 900px;
   background: #0a0a12;
   border-left: 1px solid #14141e;
+  box-shadow: -6px 0 32px rgba(0,0,0,.55);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transition: width .2s ease;
-  position: relative;
+  z-index: 80;
+  transition: transform .22s cubic-bezier(.4,0,.2,1), box-shadow .22s;
 }
 .ai-panel--closed {
-  width: 0 !important;
-  min-width: 0 !important;
-  border-left: none;
-  overflow: hidden;
+  transform: translateX(100%);
+  box-shadow: none;
+  pointer-events: none;
 }
 
 /* ── Header ────────────────────────────────────────────────── */
@@ -1497,6 +1501,43 @@ html, body {
   border-color: #3a1a1a;
   color: #f87171;
   font-size: 11px;
+}
+
+/* Thinking indicator */
+.ai-thinking {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+.ai-thinking-dots {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.ai-thinking-dots span {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #6366f1;
+  animation: ai-dot-bounce 1.4s infinite ease-in-out both;
+}
+.ai-thinking-dots span:nth-child(1) { animation-delay: -0.32s; }
+.ai-thinking-dots span:nth-child(2) { animation-delay: -0.16s; }
+.ai-thinking-dots span:nth-child(3) { animation-delay: 0s; }
+.ai-thinking-label {
+  font-size: 12px;
+  color: #6366f1;
+  opacity: 0.8;
+}
+.ai-thinking-sec {
+  font-size: 11px;
+  color: #555;
+}
+@keyframes ai-dot-bounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40%           { transform: scale(1.0); opacity: 1; }
 }
 
 /* Streaming cursor */
@@ -1819,6 +1860,35 @@ html, body {
 .ai-panel--plan .ai-bubble-avatar .material-symbols-outlined {
   color: #3b82f6;
 }
+
+/* ── Plan→Act banner ── */
+.ai-act-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 7px 10px;
+  background: #1a1400;
+  border: 1px solid #f59e0b44;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #ccc;
+  flex-wrap: wrap;
+}
+.ai-act-banner strong { color: #f59e0b; }
+.ai-act-banner-btn {
+  margin-left: auto;
+  padding: 3px 10px;
+  background: #f59e0b;
+  color: #000;
+  border: none;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ai-act-banner-btn:hover { background: #fbbf24; }
 
 /* ── P6: AI Quick Actions toolbar button ─────────────────── */
 .btn-ai-quick {

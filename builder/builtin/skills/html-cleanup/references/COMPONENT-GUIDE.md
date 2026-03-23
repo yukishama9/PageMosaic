@@ -1,4 +1,4 @@
-# WebBuilder — Component Marker Guide
+# PageMosaic — Component & System Reference Guide
 
 > 参考文件：`templates/component-markers-template.html`
 
@@ -82,9 +82,47 @@
 <!-- @/each -->
 ```
 
+### 共享数据类型说明
+
+| 类型 | 字段 | 说明 |
+|------|------|------|
+| `menu` | `label`, `i18nKey`, `href` | 导航菜单项 |
+| `icon-links` | `label`, `icon`, `href` | 社交图标链接 |
+| `languages` | `code`, `display`, `pathPrefix` | 语言切换器（pathPrefix 由 Export 引擎自动计算） |
+| `custom` | 任意字段 | 自定义列表，字段在 Shared Data Editor 中定义 |
+
 ---
 
-## 四、i18n 翻译键引用
+## 四、模板 Token 完整参考
+
+所有 Token 在 **预览和 Export 时**均会被解析替换。
+
+| Token | 解析结果 | 使用场景 |
+|-------|----------|----------|
+| `{{t:i18n.key}}` | 当前语言的翻译字符串 | 所有用户可见文字 |
+| `{{field:key}}` | 组件/字段编辑器中设置的值 | Logo href/text 等可编辑字段 |
+| `{{pageName}}` | 当前页面文件名（如 `about.html`） | 语言切换器链接拼接 |
+| `{{lang}}` | 当前语言代码（如 `zh-SC`） | `<html lang="">` 动态设置、条件样式 |
+| `{{item.fieldKey}}` | `@each` 循环体内当前项的字段值 | 循环内数据渲染 |
+| `{{t:item.i18nKey}}` | 循环项的 i18n key 对应翻译值 | 循环内多语言标签 |
+
+```html
+<!-- 所有 Token 综合示例 -->
+<html lang="{{lang}}">
+  ...
+  <!-- @each:main-menu -->
+  <a href="{{item.href}}" class="{{pageName}} == index.html ? active : ''">
+    {{t:item.i18nKey}}
+  </a>
+  <!-- @/each -->
+
+  <!-- 组件字段 -->
+  <a href="{{field:logo_href}}">
+    <img src="{{field:logo_src}}" alt="{{field:logo_alt}}">
+  </a>
+```
+
+### i18n 翻译键引用
 
 所有用户可见文字应使用 i18n 键，而非直接写死文本：
 
@@ -94,7 +132,7 @@
 <p>{{t:footer.copyright}}</p>
 <h3>{{t:cookie.title}}</h3>
 
-<!-- 引用组件字段值（在 WebBuilder 组件编辑器中设置） -->
+<!-- 引用组件字段值（在 PageMosaic 组件编辑器中设置） -->
 <a href="{{field:logo_href}}">{{field:logo_text}}</a>
 ```
 
@@ -302,3 +340,167 @@ releases/
   5. 字段数据保存在 project.json（不修改 HTML 源文件）
   6. Export 时自动注入到每个页面 </head> 之前
 ```
+
+---
+
+## 九、CSS 模式与 Theme Engine
+
+PageMosaic 支持三种 CSS 模式，在新建项目时选择，影响 Theme Editor 的行为和导出输出。
+
+### CSS 模式对比
+
+| 模式 | `<head>` 中的样式 | Theme Editor | 说明 |
+|------|-------------------|--------------|------|
+| `tailwind-cdn` | `<script src="https://cdn.tailwindcss.com">` | ✅ 完整支持 | 默认模式，无需本地构建 |
+| `tailwind-local` | `<link href="assets/css/tailwind.css">` | ✅ 支持（需重编译） | 适合生产部署，零 CDN 依赖 |
+| `custom` | 自定义 `<link rel="stylesheet">` | ❌ 不适用 | 使用自有 CSS，Theme Editor 不生效 |
+
+### tailwind-cdn 模式下的 `<head>` 标准写法
+
+```html
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- @meta:managed -->
+
+  <!-- Tailwind CDN — PageMosaic 会在此后自动注入 tailwind.config -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Google Fonts — PageMosaic 会根据 Theme 设置自动替换此链接 -->
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=Manrope:wght@200..800&family=Space+Grotesk:wght@300..700&display=swap" rel="stylesheet">
+  <!-- Material Symbols（导航图标等） -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+
+  <title>Page Title</title>
+</head>
+```
+
+### Theme Engine 颜色系统
+
+主题由 5 个种子色生成完整的 M3 风格色盘（40+ 色阶）：
+
+| 种子色 | 说明 | Tailwind 类名示例 |
+|--------|------|-------------------|
+| `primary` | 主品牌色 | `text-primary` `bg-primary` |
+| `primaryContainer` | 主色容器背景 | `bg-primary-container` |
+| `surface` | 页面背景色 | `bg-surface` |
+| `onSurface` | 正文文字色 | `text-on-surface` |
+| `secondary` | 次要强调色 | `text-secondary` |
+
+**常用衍生色阶：**
+
+```html
+<!-- 背景层次 -->
+<div class="bg-surface">           <!-- 基础背景 -->
+<div class="bg-surface-container"> <!-- 卡片/面板背景 -->
+<div class="bg-surface-container-high"> <!-- 悬浮元素 -->
+
+<!-- 文字层次 -->
+<p class="text-on-surface">       <!-- 主要文字 -->
+<p class="text-on-surface-variant"> <!-- 次要文字 -->
+
+<!-- 分割线 -->
+<hr class="border-outline-variant">
+
+<!-- 主色按钮 -->
+<button class="bg-primary text-on-primary rounded px-4 py-2">
+```
+
+### 字体角色
+
+| 角色 | Tailwind 类 | 用途 |
+|------|-------------|------|
+| 标题字体 | `font-headline` | 大标题、展示文字 |
+| 正文字体 | `font-body` | 段落、正文内容 |
+| 标签字体 | `font-label` | 按钮、导航、UI 标签 |
+
+### 圆角预设
+
+| 预设 | `rounded` | `rounded-lg` | `rounded-full` |
+|------|-----------|--------------|----------------|
+| `sharp` | 2px | 4px | 12px |
+| `rounded` | 6px | 8px | 24px |
+| `pill` | 12px | 16px | 9999px |
+
+---
+
+## 十、Custom Head Code（自定义 `<head>` 代码）
+
+**位置：** 侧栏 → Project Settings → Head Code
+
+用于插入 Google Analytics、Facebook Pixel、Hotjar 等第三方脚本。
+
+**重要规则：**
+- Head Code **仅在 Export 时写入**，预览中不执行（避免统计数据污染）
+- 代码插入位置：所有页面 `</head>` 之前
+- 不要在页面 HTML 中直接添加分析脚本，统一通过 Head Code 管理
+
+```html
+<!-- Head Code 示例：Google Analytics GA4 -->
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-XXXXXXXXXX');
+</script>
+```
+
+---
+
+## 十一、Export 多语言结构与 hreflang
+
+### 导出目录结构
+
+```
+releases/
+  project-name/
+    index.html          ← 基础语言（如 en）页面，置于根目录
+    about.html
+    services.html
+    assets/             ← 共享资源（CSS、JS、图片）
+      css/
+      images/
+    zh-SC/              ← 简体中文，置于语言子目录
+      index.html
+      about.html
+      services.html
+    ja/                 ← 日语
+      index.html
+      ...
+```
+
+**规则：**
+- 基础语言（`baseLanguage`）页面输出到根目录
+- 其他语言输出到 `/{lang-code}/` 子目录
+- 资源文件（`assets/`）仅复制一份到根目录；语言子目录页面的资产路径自动添加 `../` 前缀
+- `.html` 页面间链接**不修改**——所有语言使用相同文件名，与同级页面相互链接即可
+
+### hreflang 自动注入
+
+Export 时，PageMosaic 自动为每个页面的每个语言版本注入 `<link rel="alternate" hreflang>` 标签：
+
+```html
+<!-- 以 about.html 为例，项目有 en / zh-SC / ja 三种语言 -->
+<link rel="alternate" hreflang="x-default" href="https://example.com/about.html">
+<link rel="alternate" hreflang="en"    href="https://example.com/about.html">
+<link rel="alternate" hreflang="zh-SC" href="https://example.com/zh-SC/about.html">
+<link rel="alternate" hreflang="ja"    href="https://example.com/ja/about.html">
+```
+
+**前提条件：** 在 Project Settings 中填写 `Canonical Base URL`（如 `https://example.com`），否则使用相对路径。
+
+### 语言切换器路径说明
+
+`languages` 共享数据中的 `pathPrefix` 字段**由 Export 引擎自动计算**，无需手动填写：
+
+| 当前语言 | 目标语言 | 自动计算的 pathPrefix |
+|---------|---------|----------------------|
+| `en`（根） | `zh-SC` | `zh-SC/` |
+| `zh-SC`（子目录） | `en` | `../` |
+| `zh-SC`（子目录） | `ja` | `../ja/` |
+| `zh-SC` | `zh-SC`（自身） | `''`（空） |
+
+预览模式下 `pathPrefix` 使用 Shared Data Editor 中填写的值（或空值）；正式路径仅在 Export 时生成。

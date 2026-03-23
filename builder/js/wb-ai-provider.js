@@ -228,6 +228,7 @@ const AiProvider = {
     provider: 'openai',
     endpoint: '',       // custom endpoint override; empty = use provider default
     model: 'gpt-4o',
+    planModel: '',      // optional separate model for Plan mode; empty = use model
     maxTokens: 4096,
     temperature: 0.7,
     apiKey: '',         // in-memory only — never written to plain storage
@@ -326,6 +327,22 @@ const AiProvider = {
         { type: 'text', text: msg.content || '' },
       ],
     };
+  },
+
+  // ── Chat with mode-aware model selection ─────────────────────────────────────
+  // mode: 'plan' | 'act' — uses planModel for plan mode if configured
+  chatWithMode(mode, messages, callbacks) {
+    const planModel = (this.config.planModel || '').trim();
+    if (mode === 'plan' && planModel && planModel !== this.config.model) {
+      // Temporarily swap model for this call
+      const saved = this.config.model;
+      this.config.model = planModel;
+      const ac = this.chat(messages, callbacks);
+      // Restore after call is initiated (async, so restore immediately after sync setup)
+      this.config.model = saved;
+      return ac;
+    }
+    return this.chat(messages, callbacks);
   },
 
   // ── Unified streaming chat ────────────────────────────────────────────────────
