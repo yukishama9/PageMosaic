@@ -358,6 +358,68 @@ title: Tutorial — PageMosaic
 
   <hr class="step-divider">
 
+  <!-- Step 5 -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">5</div>
+      <h2 class="step-title">Use the Built-in AI Assistant</h2>
+    </div>
+    <div class="step-body">
+      <p>
+        PageMosaic includes a built-in AI chat panel. Click the <strong>AI</strong> button in the top-right toolbar
+        (or press <kbd style="background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-size:.85em;">Ctrl+Shift+A</kbd>)
+        to open the panel. It floats over the editor so your code and preview remain fully visible.
+      </p>
+
+      <h3 style="font-size:1rem;margin:1.25rem 0 .5rem;color:var(--fg);">Configure your AI provider</h3>
+      <p>
+        Open the <strong>Settings</strong> tab inside the AI panel. Choose a provider (OpenAI, Anthropic, Gemini, or any
+        OpenAI-compatible endpoint), paste your API key, and click <strong>Save</strong>. Use the <strong>Test</strong>
+        button to verify the connection before you start chatting.
+      </p>
+
+      <h3 style="font-size:1rem;margin:1.25rem 0 .5rem;color:var(--fg);">Plan mode vs. Act mode</h3>
+      <p>
+        The panel has two modes, selectable from the toggle at the bottom:
+      </p>
+      <ul>
+        <li><strong>Plan mode</strong> — the AI analyses your request and explains what it will do step-by-step. No code is auto-applied. Use this to review the approach before committing.</li>
+        <li><strong>Act mode</strong> — the AI writes complete HTML code and applies it directly to the active page or component editor the moment the response finishes.</li>
+      </ul>
+      <div class="callout">
+        <strong>Tip:</strong> Start in <strong>Plan</strong> mode for complex changes. Switch to <strong>Act</strong> mode once you're happy with the plan — the AI will implement it in one step.
+      </div>
+
+      <h3 style="font-size:1rem;margin:1.25rem 0 .5rem;color:var(--fg);">Context-aware suggestions</h3>
+      <p>
+        When a page or component is open, the AI automatically has its HTML as context.
+        You can also use slash commands to inject extra context:
+      </p>
+      <ul>
+        <li><code>/page</code> — append the full active page HTML to your message</li>
+        <li><code>/comp</code> — append the full active component HTML</li>
+        <li><code>/i18n</code> — append the current language's translation keys</li>
+      </ul>
+
+      <h3 style="font-size:1rem;margin:1.25rem 0 .5rem;color:var(--fg);">Skills &amp; Agents</h3>
+      <p>
+        Skills extend the AI with task-specific instructions (e.g. <strong>HTML Cleanup</strong> enforces PageMosaic
+        component markers; <strong>SEO Optimizer</strong> rewrites meta tags). Select a skill from the toolbar
+        drop-down before sending your message.
+      </p>
+      <p>
+        Agent personas let you switch the AI's role — for example a <strong>Web Developer</strong> agent focuses
+        on clean semantic HTML, while a <strong>Copywriter</strong> agent focuses on persuasive page copy.
+      </p>
+      <div class="callout">
+        <strong>Tip:</strong> Add your own skills by placing a <code>SKILL.md</code> or <code>.skill.json</code> file
+        in the <code>skills/</code> sub-folder of your configured AI Library folder (set in the Settings tab).
+      </div>
+    </div>
+  </div>
+
+  <hr class="step-divider">
+
   <!-- What's next -->
   <div class="step">
     <div class="step-header">

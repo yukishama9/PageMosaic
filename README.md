@@ -15,7 +15,9 @@ PageMosaic is a lightweight desktop tool for building and maintaining static HTM
 🎨 **Theme editor** — Visual color, font, and shape controls with Tailwind CDN / Local / Custom CSS modes.  
 🖼 **Live preview** — Desktop / Tablet / Mobile switcher with per-language, instant hot-reload preview.  
 📥 **Import existing sites** — Auto-detects headers, footers, and cookie banners from any HTML folder.  
-📤 **Export** — Clean per-language output with metadata, OG tags, and custom head code injected automatically.
+📤 **Export** — Clean per-language output with metadata, OG tags, and custom head code injected automatically.  
+🤖 **Built-in AI assistant** — Streaming chat panel with Plan/Act modes; AI-generated code applies directly to the active editor.  
+🔌 **Skill & Agent system** — Extend the AI with reusable skills (e.g. HTML Cleanup) and custom agent personas.
 
 ![PageMosaic UI](https://raw.githubusercontent.com/yukishama9/PageMosaic/main/docs/assets/img/screenshot-01.png)
 
