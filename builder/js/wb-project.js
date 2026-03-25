@@ -484,6 +484,9 @@ const ProjectManager = {
     await this._loadProject(destHandle, project);
     await FileHandler.persistHandle('last-project', destHandle);
 
+    // Refresh sidebar so all pages/components are visible immediately
+    if (typeof UI !== 'undefined') UI.loadSidebar();
+
     Utils.showToast(
       `Imported "${project.title}" → projects/${project.name}. ${project.components.length} component(s) extracted.`,
       'info', 5000
