@@ -25,14 +25,15 @@ module.exports = {
   rebuildConfig: {},
 
   makers: [
-    // Windows: Squirrel installer (.exe) — Windows only
-    {
-      name: '@electron-forge/maker-squirrel',
-      platforms: ['win32'],
-      config: {
-        name: 'PageMosaic',
-      },
-    },
+    // NOTE: maker-squirrel is disabled because rcedit.exe (used internally by
+    // electron-winstaller) cannot handle non-ASCII characters in the project
+    // path (this repo lives under a Chinese-character directory). Use the ZIP
+    // distributable instead for Windows releases.
+    // {
+    //   name: '@electron-forge/maker-squirrel',
+    //   platforms: ['win32'],
+    //   config: { name: 'PageMosaic' },
+    // },
     // macOS: DMG disk image — macOS only
     {
       name: '@electron-forge/maker-dmg',
