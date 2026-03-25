@@ -7,6 +7,7 @@
 PageMosaic is a lightweight desktop tool for building and maintaining static HTML websites. No framework. No build step. Pure HTML files you own completely.
 
 🌐 **Project homepage:** https://yukishama9.github.io/PageMosaic/
+🌐 **Demo Multi-Language Site:** https://heliopolis-cc.com/
 
 ---
 
