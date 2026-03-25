@@ -499,9 +499,11 @@ const Preview = {
     return `[${key}]`;
   },
 
-  // ── Resolve local asset paths → Blob URLs ────────────────────────────────────
+  // ── Resolve local asset paths → loadable URLs ────────────────────────────────
   // When using srcdoc, the iframe base is about:srcdoc so relative paths break.
-  // This reads local project files via FSA and replaces paths with blob: URLs.
+  // • Browser mode: reads local project files via FSA and replaces paths with blob: URLs.
+  // • Electron mode: converts relative paths to file:// absolute URLs.
+  //   (Electron sets webSecurity:false so file:// loads correctly inside srcdoc iframes.)
   async _resolveLocalAssets(html) {
     if (!State.projectHandle) return html;
 
@@ -520,6 +522,21 @@ const Preview = {
 
     const resolved = new Map();
 
+    // ── Electron mode: use file:// absolute URLs ──────────────────────────────
+    if (State.projectHandle._path) {
+      const basePath = State.projectHandle._path.replace(/\\/g, '/').replace(/\/$/, '');
+      const fileUrlBase = basePath.startsWith('/') ? `file://${basePath}` : `file:///${basePath}`;
+
+      for (const rawPath of pathsToResolve) {
+        if (rawPath.startsWith('{{') || rawPath.startsWith('@')) continue;
+        const cleanPath = rawPath.replace(/^\.\//, '');
+        if (!cleanPath) continue;
+        const fileUrl = `${fileUrlBase}/${cleanPath}`;
+        resolved.set(rawPath, fileUrl);
+        if (cleanPath !== rawPath) resolved.set(cleanPath, fileUrl);
+      }
+    } else {
+    // ── Browser (FSA) mode: read files and create blob: URLs ─────────────────
     for (const rawPath of pathsToResolve) {
       // Skip paths that look like template tokens or anchors
       if (rawPath.startsWith('{{') || rawPath.startsWith('@')) continue;
@@ -542,6 +559,7 @@ const Preview = {
         // File not found or permission denied — leave original path
       }
     }
+    } // end browser FSA mode
 
     if (resolved.size === 0) return html;
 
