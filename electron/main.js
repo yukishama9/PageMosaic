@@ -160,6 +160,31 @@ ipcMain.handle('app:getResourcesPath', () => {
   return path.join(__dirname, '../builder/builtin');
 });
 
+// ── App Config persistence (projects/releases folder paths, window state, etc.)
+// Stored in a JSON file next to the app's userData directory
+// ---------------------------------------------------------------------------
+const CONFIG_PATH = path.join(app.getPath('userData'), 'pagemosaic-config.json');
+
+ipcMain.handle('config:load', async () => {
+  try {
+    const raw = await fsPromises.readFile(CONFIG_PATH, 'utf8');
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+});
+
+ipcMain.handle('config:save', async (_event, data) => {
+  try {
+    await fsPromises.mkdir(path.dirname(CONFIG_PATH), { recursive: true });
+    await fsPromises.writeFile(CONFIG_PATH, JSON.stringify(data, null, 2), 'utf8');
+    return true;
+  } catch (err) {
+    console.error('config:save error', err);
+    return false;
+  }
+});
+
 // ── Tailwind CSS compilation ──────────────────────────────────────────────────
 // Writes tailwind.config.js to dirPath, then runs:
 //   npx tailwindcss -i input.css -o assets/css/tailwind.css

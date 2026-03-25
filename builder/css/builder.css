@@ -267,6 +267,45 @@ html, body {
 }
 .toolbar-select:focus { outline: none; border-color: #3730a3; }
 
+/* View mode switcher (Code/Split/Preview) */
+.view-mode-switcher {
+  display: flex;
+  background: #0d0d11;
+  border: 1px solid #222228;
+  border-radius: 5px;
+  overflow: hidden;
+  margin-right: 4px;
+}
+.view-mode-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  background: none;
+  border: none;
+  color: #444;
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.view-mode-btn:hover { background: #1a1a24; color: #888; }
+.view-mode-btn.active { background: #1a1830; color: #818cf8; }
+.view-mode-btn .material-symbols-outlined { font-size: 15px; }
+
+/* Split resizer drag handle */
+.split-resizer {
+  width: 4px;
+  flex-shrink: 0;
+  background: #1a1a24;
+  cursor: col-resize;
+  transition: background .15s;
+  position: relative;
+  z-index: 10;
+}
+.split-resizer:hover,
+.split-resizer.dragging {
+  background: #6366f1;
+}
+
 /* Device switcher */
 .device-switcher {
   display: flex;
@@ -397,6 +436,7 @@ html, body {
   background: #0d0d11;
   overflow: hidden;
   flex-shrink: 0;
+  position: relative;
 }
 .code-panel-header {
   display: flex;
@@ -448,7 +488,7 @@ html, body {
 .comp-editor-inner { padding: 16px; }
 .comp-right-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
 .comp-preview-area { flex: 1; display: flex; flex-direction: column; border-bottom: 2px solid #1a1a24; min-height: 120px; overflow: hidden; }
-.comp-code-area { flex: 1; display: flex; flex-direction: column; min-height: 120px; overflow: hidden; }
+.comp-code-area { flex: 1; display: flex; flex-direction: column; min-height: 120px; overflow: hidden; position: relative; }
 .comp-panel-label {
   display: flex; align-items: center; gap: 5px;
   padding: 4px 10px;
@@ -1184,6 +1224,55 @@ html, body {
 .CodeMirror-linenumber { color: #333 !important; }
 .CodeMirror-cursor { border-left-color: #818cf8 !important; }
 .CodeMirror-selected { background: #1e1e3a !important; }
+
+/* ── CodeMirror Search Dialog (dark theme) ───────────────────────────────── */
+.CodeMirror-dialog {
+  background: #0f0f18 !important;
+  border-bottom: 1px solid #2a2a3e !important;
+  color: #ccc !important;
+  padding: 6px 10px !important;
+  font-size: 12px !important;
+}
+.CodeMirror-dialog input {
+  background: #0d0d1a !important;
+  border: 1px solid #2a2a40 !important;
+  border-radius: 4px !important;
+  color: #ccc !important;
+  font-size: 12px !important;
+  padding: 3px 8px !important;
+  outline: none !important;
+  margin: 0 6px !important;
+  font-family: inherit !important;
+}
+.CodeMirror-dialog input:focus {
+  border-color: #6366f1 !important;
+}
+.CodeMirror-dialog button {
+  background: #1e1b3a !important;
+  border: 1px solid #3730a3 !important;
+  border-radius: 4px !important;
+  color: #a5b4fc !important;
+  font-size: 11px !important;
+  padding: 3px 10px !important;
+  cursor: pointer !important;
+  margin-left: 4px !important;
+  transition: background .12s !important;
+}
+.CodeMirror-dialog button:hover {
+  background: #3730a3 !important;
+  color: #fff !important;
+}
+.CodeMirror-search-hint {
+  color: #555 !important;
+  font-size: 11px !important;
+}
+/* Highlighted search matches */
+.CodeMirror-searching {
+  background: #3a3a00 !important;
+  color: #fff !important;
+}
+.cm-matchhighlight { background: #1e1e00 !important; }
+.CodeMirror-selection-highlight-scrollbar { background: #f59e0b !important; }
 
 /* ── Content scrollbar ────────────────────────────────────────────────────── */
 .content-scroll { scrollbar-width: thin; }
@@ -2277,4 +2366,125 @@ html, body {
   background: #1a0e00;
   border: 1px solid #7c2d12;
   border-radius: 4px;
+}
+
+/* ── Custom Search / Replace Panel ──────────────────────────────────────────── */
+.cm-search-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 50;
+  background: #0f0f1a;
+  border: 1px solid #2a2a42;
+  border-top: none;
+  border-radius: 0 0 0 8px;
+  box-shadow: -4px 4px 20px rgba(0,0,0,.55);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 480px;
+  max-width: 560px;
+  user-select: none;
+  animation: srp-in .12s ease-out;
+}
+@keyframes srp-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Each row: buttons-left + input-right */
+.cm-search-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border-bottom: 1px solid #1a1a2a;
+}
+.cm-search-row:last-child { border-bottom: none; }
+
+/* Left button group */
+.cm-search-btns {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 5px 6px;
+  border-right: 1px solid #1a1a2a;
+  flex-shrink: 0;
+  background: #0a0a14;
+}
+.cm-sr-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 4px 8px;
+  background: #141420;
+  border: 1px solid #252535;
+  border-radius: 4px;
+  color: #888;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .12s, color .12s, border-color .12s;
+  line-height: 1;
+}
+.cm-sr-btn:hover { background: #1e1e32; color: #ccc; border-color: #3a3a5a; }
+.cm-sr-btn .material-symbols-outlined { font-size: 14px; }
+.cm-sr-btn--icon { padding: 4px 5px; }
+.cm-sr-btn--primary {
+  background: #1e1b3a;
+  border-color: #3730a3;
+  color: #a5b4fc;
+}
+.cm-sr-btn--primary:hover { background: #3730a3; color: #fff; border-color: #4f46e5; }
+.cm-sr-btn--close {
+  background: none;
+  border-color: transparent;
+  color: #444;
+}
+.cm-sr-btn--close:hover { background: #2a1010; color: #ef4444; border-color: transparent; }
+
+/* Input field */
+.cm-search-input-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  gap: 6px;
+}
+.cm-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #ccc;
+  font-size: 12px;
+  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+  padding: 2px 0;
+  line-height: 1.5;
+}
+.cm-search-input::placeholder { color: #333; }
+
+/* Match counter badge */
+.cm-search-count {
+  font-size: 10px;
+  color: #444;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-family: monospace;
+  min-width: 44px;
+  text-align: right;
+}
+.cm-search-count.has-matches { color: #6366f1; }
+.cm-search-count.no-matches  { color: #f87171; }
+
+/* Highlight marks */
+.cm-search-match-all {
+  background: rgba(251,191,36,.18) !important;
+  border-radius: 2px;
+}
+.cm-search-match-current {
+  background: rgba(251,191,36,.72) !important;
+  color: #000 !important;
+  border-radius: 2px;
+  outline: 1px solid #f59e0b;
 }

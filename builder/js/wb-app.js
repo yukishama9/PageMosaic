@@ -15,6 +15,9 @@ const App = {
       }
     });
 
+    // Initialize split resizer drag behaviour
+    this._initSplitResizer();
+
     // Restore persisted workspace handles from IndexedDB, then refresh UI
     await ProjectManager.setupWorkspace();
     await this._updateWorkspaceStatus();
@@ -786,9 +789,88 @@ const App = {
     }
   },
 
-  // ── Code panel toggle ──────────────────────────────────────────────────────────
-  toggleCodePanel() {
-    UI.toggleCodePanel();
+  // ── View mode: split / code / preview ─────────────────────────────────────────
+  _viewMode: 'split',
+
+  setViewMode(mode) {
+    this._viewMode = mode;
+    const codePanel    = document.getElementById('editor-code-panel');
+    const previewPanel = document.getElementById('editor-preview-panel');
+    const resizer      = document.getElementById('editor-split-resizer');
+
+    // Update button states
+    ['split','code','preview'].forEach(m => {
+      const btn = document.getElementById(`vmode-${m}`);
+      if (btn) btn.classList.toggle('active', m === mode);
+    });
+
+    if (mode === 'code') {
+      if (codePanel)    { codePanel.style.width = '100%'; codePanel.style.display = ''; }
+      if (previewPanel) previewPanel.style.display = 'none';
+      if (resizer)      resizer.style.display = 'none';
+    } else if (mode === 'preview') {
+      if (codePanel)    codePanel.style.display = 'none';
+      if (previewPanel) { previewPanel.style.display = ''; previewPanel.style.flex = '1'; }
+      if (resizer)      resizer.style.display = 'none';
+    } else {
+      // split
+      if (codePanel)    { codePanel.style.display = ''; codePanel.style.width = this._splitWidth || '42%'; }
+      if (previewPanel) { previewPanel.style.display = ''; previewPanel.style.flex = '1'; }
+      if (resizer)      resizer.style.display = '';
+    }
+
+    // Refresh CodeMirror after layout change
+    setTimeout(() => {
+      State.pageCodeMirror?.refresh();
+      State.compCodeMirror?.refresh();
+    }, 60);
+
+    Preview.renderCurrentPage();
+  },
+
+  _splitWidth: '42%',
+
+  _initSplitResizer() {
+    const resizer  = document.getElementById('editor-split-resizer');
+    if (!resizer) return;
+    let dragging = false;
+    let startX   = 0;
+    let startW   = 0;
+
+    resizer.addEventListener('mousedown', (e) => {
+      const codePanel = document.getElementById('editor-code-panel');
+      if (!codePanel) return;
+      dragging = true;
+      startX   = e.clientX;
+      startW   = codePanel.getBoundingClientRect().width;
+      resizer.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      const codePanel   = document.getElementById('editor-code-panel');
+      const splitEl     = codePanel?.parentElement;
+      if (!codePanel || !splitEl) return;
+      const delta       = e.clientX - startX;
+      const totalW      = splitEl.getBoundingClientRect().width;
+      const newW        = Math.max(200, Math.min(startW + delta, totalW - 200));
+      const pct         = (newW / totalW * 100).toFixed(2) + '%';
+      codePanel.style.width = pct;
+      this._splitWidth = pct;
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (!dragging) return;
+      dragging = false;
+      resizer.classList.remove('dragging');
+      document.body.style.cursor  = '';
+      document.body.style.userSelect = '';
+      // Refresh editor after resize
+      setTimeout(() => State.pageCodeMirror?.refresh(), 60);
+    });
   },
 
   // ── Preview device ─────────────────────────────────────────────────────────────

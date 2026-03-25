@@ -20,6 +20,12 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/brace-fold.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/xml-fold.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.css">
+  <!-- CodeMirror Search & Replace addons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/searchcursor.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/search.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/match-highlighter.min.js"></script>
 
   <!-- Material Symbols -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
@@ -236,10 +242,18 @@
         <span id="page-editor-filename" class="toolbar-filename"></span>
         <span id="page-dirty-dot" class="dirty-dot hidden">●</span>
         <div class="toolbar-spacer"></div>
-        <!-- Code panel toggle -->
-        <button id="btn-toggle-code" class="toolbar-btn" onclick="App.toggleCodePanel()" title="Hide Code">
-          <span class="material-symbols-outlined">code_off</span>
-        </button>
+        <!-- View mode toggle: Code / Split / Preview -->
+        <div class="view-mode-switcher" id="view-mode-switcher">
+          <button class="view-mode-btn active" id="vmode-split" onclick="App.setViewMode('split')" title="Split view">
+            <span class="material-symbols-outlined">vertical_split</span>
+          </button>
+          <button class="view-mode-btn" id="vmode-code" onclick="App.setViewMode('code')" title="Code only">
+            <span class="material-symbols-outlined">code</span>
+          </button>
+          <button class="view-mode-btn" id="vmode-preview" onclick="App.setViewMode('preview')" title="Preview only">
+            <span class="material-symbols-outlined">preview</span>
+          </button>
+        </div>
         <button class="toolbar-btn" onclick="PageEditor.insertComponent()" title="Insert component">
           <span class="material-symbols-outlined">add_box</span>
         </button>
@@ -320,6 +334,9 @@
           </div>
           <div id="page-codemirror-wrap" class="codemirror-wrap"></div>
         </div>
+
+        <!-- Resizer drag handle -->
+        <div id="editor-split-resizer" class="split-resizer" title="Drag to resize"></div>
 
         <!-- Preview panel -->
         <div id="editor-preview-panel" class="preview-panel">

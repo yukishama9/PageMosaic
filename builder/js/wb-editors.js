@@ -40,6 +40,14 @@ const PageEditor = {
         extraKeys: {
           'Ctrl-S': () => this.save(),
           'Cmd-S': () => this.save(),
+          'Ctrl-F': () => {
+            const wrap = document.getElementById('editor-code-panel');
+            if (wrap) SearchReplace.toggle(State.pageCodeMirror, wrap);
+          },
+          'Cmd-F': () => {
+            const wrap = document.getElementById('editor-code-panel');
+            if (wrap) SearchReplace.toggle(State.pageCodeMirror, wrap);
+          },
         },
       });
       State.pageCodeMirror.on('change', Utils.debounce(() => {
@@ -228,20 +236,35 @@ const ComponentEditor = {
 
     wrap.innerHTML = html;
 
-    // Attach field change listeners
-    wrap.querySelectorAll('.vf-input').forEach(input => {
+    // Attach field change listeners (regular fields)
+    wrap.querySelectorAll('.vf-input:not(.vf-i18n-input)').forEach(input => {
       input.addEventListener('input', () => {
         const key = input.dataset.key;
         const field = (comp.schema?.fields || []).find(f => f.key === key);
         if (field) {
           field.value = input.value;
           UI.setDirty(`comp:${this._id}`, true);
-          // Sync to code editor
-          if (State.compCodeMirror) {
-            // Don't rebuild whole editor — just refresh preview
-          }
           Preview.renderComponent(this._id);
         }
+      });
+    });
+
+    // Attach i18n-ref field change listeners (base language string editing)
+    wrap.querySelectorAll('.vf-i18n-input').forEach(input => {
+      input.addEventListener('input', () => {
+        const i18nKey = input.dataset.i18nKey;
+        const lang = input.dataset.lang;
+        if (!i18nKey || !lang) return;
+        if (!State.i18nData[lang]) State.i18nData[lang] = {};
+        State.i18nData[lang][i18nKey] = input.value;
+        UI.setDirty(`comp:${this._id}`, true);
+        // Debounced auto-save the i18n file
+        clearTimeout(this._i18nSaveTimer);
+        this._i18nSaveTimer = setTimeout(() => {
+          ProjectManager.saveI18n(lang);
+          UI.renderLanguages();
+        }, 1500);
+        Preview.renderComponent(this._id);
       });
     });
   },
@@ -255,10 +278,11 @@ const ComponentEditor = {
           <span>${Utils.escapeHtml(field.label)}</span>
           <span class="vf-i18n-badge" onclick="I18nEditor.open('${baseLang}')">🌍 ${Utils.escapeHtml(field.i18nKey)}</span>
         </div>
-        <div style="background:#0a0a0e;border:1px solid #1e1e28;border-radius:5px;padding:6px 10px;font-size:11px;color:#666;display:flex;align-items:center;justify-content:space-between">
-          <span>${Utils.escapeHtml(currentVal) || '(not set)'}</span>
-          <button onclick="I18nEditor.open('${baseLang}')" style="font-size:11px;color:#818cf8;background:none;border:none;cursor:pointer;padding:0;margin-left:8px">Edit →</button>
-        </div>
+        <input type="text" class="vf-input vf-i18n-input"
+               data-i18n-key="${Utils.escapeHtml(field.i18nKey)}"
+               data-lang="${Utils.escapeHtml(baseLang)}"
+               value="${Utils.escapeHtml(currentVal)}"
+               placeholder="Enter ${Utils.escapeHtml(baseLang)} text…">
       </div>`;
     }
 
@@ -293,6 +317,14 @@ const ComponentEditor = {
         extraKeys: {
           'Ctrl-S': () => ComponentEditor.save(),
           'Cmd-S': () => ComponentEditor.save(),
+          'Ctrl-F': () => {
+            const wrap = document.querySelector('.comp-code-area');
+            if (wrap) SearchReplace.toggle(State.compCodeMirror, wrap);
+          },
+          'Cmd-F': () => {
+            const wrap = document.querySelector('.comp-code-area');
+            if (wrap) SearchReplace.toggle(State.compCodeMirror, wrap);
+          },
         },
       });
 
@@ -1148,6 +1180,259 @@ const ThemeEditor = {
       summaryEl.textContent = `${headline} / ${body} · ${radius}`;
     }
   },
+};
+
+// ─── Search / Replace Panel ───────────────────────────────────────────────────
+// A persistent, custom search-replace bar that floats over the active CodeMirror
+// editor. Supports: Ctrl+F to open, Enter/Shift+Enter to navigate, highlight all
+// matches, replace-one, replace-all. Panel stays open until the user closes it.
+const SearchReplace = {
+  _cm: null,          // current CodeMirror instance
+  _container: null,   // DOM container the panel is appended to
+  _panel: null,       // panel DOM element (or null when closed)
+  _marks: [],         // all match TextMarker objects
+  _currentIdx: -1,    // index of currently highlighted match
+  _matches: [],       // [{from, to}] positions of all matches
+
+  // ── Open (or focus) the panel attached to a given CodeMirror + DOM container ──
+  open(cm, container) {
+    this._cm = cm;
+    this._container = container;
+
+    // Make sure container is relatively positioned (CSS already sets this, but guard)
+    const pos = window.getComputedStyle(container).position;
+    if (pos === 'static') container.style.position = 'relative';
+
+    if (this._panel) {
+      // Already open — just re-focus and re-run on the new cm
+      this._panel.querySelector('.cm-search-input').select();
+      this._runSearch();
+      return;
+    }
+
+    // Build the panel HTML
+    const el = document.createElement('div');
+    el.className = 'cm-search-panel';
+    el.innerHTML = `
+      <div class="cm-search-row">
+        <div class="cm-search-btns">
+          <button class="cm-sr-btn cm-sr-btn--icon" id="srp-prev" title="Previous (Shift+Enter)">
+            <span class="material-symbols-outlined">expand_less</span>
+          </button>
+          <button class="cm-sr-btn cm-sr-btn--icon" id="srp-next" title="Next (Enter)">
+            <span class="material-symbols-outlined">expand_more</span>
+          </button>
+          <button class="cm-sr-btn cm-sr-btn--close cm-sr-btn--icon" id="srp-close" title="Close (Esc)">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="cm-search-input-wrap">
+          <input class="cm-search-input" id="srp-find" placeholder="Find…" spellcheck="false" autocomplete="off">
+          <span class="cm-search-count" id="srp-count"></span>
+        </div>
+      </div>
+      <div class="cm-search-row">
+        <div class="cm-search-btns">
+          <button class="cm-sr-btn cm-sr-btn--primary" id="srp-replace-one" title="Replace">Replace</button>
+          <button class="cm-sr-btn cm-sr-btn--primary" id="srp-replace-all" title="Replace All">All</button>
+        </div>
+        <div class="cm-search-input-wrap">
+          <input class="cm-search-input" id="srp-replace" placeholder="Replace with…" spellcheck="false" autocomplete="off">
+        </div>
+      </div>`;
+
+    container.appendChild(el);
+    this._panel = el;
+
+    const findInput    = el.querySelector('#srp-find');
+    const replaceInput = el.querySelector('#srp-replace');
+
+    // Restore last search term
+    if (this._lastQuery) findInput.value = this._lastQuery;
+
+    // ── Event listeners ────────────────────────────────────────
+    findInput.addEventListener('input', () => {
+      this._lastQuery = findInput.value;
+      this._runSearch(true);
+    });
+
+    findInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (e.shiftKey) this._navigate(-1); else this._navigate(1);
+      }
+      if (e.key === 'Escape') { e.preventDefault(); this.close(); }
+    });
+
+    replaceInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); this.close(); }
+    });
+
+    el.querySelector('#srp-prev').addEventListener('click', () => this._navigate(-1));
+    el.querySelector('#srp-next').addEventListener('click', () => this._navigate(1));
+    el.querySelector('#srp-close').addEventListener('click', () => this.close());
+    el.querySelector('#srp-replace-one').addEventListener('click', () => this._replaceOne());
+    el.querySelector('#srp-replace-all').addEventListener('click', () => this._replaceAll());
+
+    // Close on Esc from editor
+    cm.addKeyMap({ 'Escape': () => { if (this._panel) this.close(); } });
+
+    findInput.focus();
+    findInput.select();
+    this._runSearch(true);
+  },
+
+  close() {
+    this._clearMarks();
+    if (this._panel) {
+      this._panel.remove();
+      this._panel = null;
+    }
+    if (this._cm) {
+      this._cm.focus();
+    }
+    this._matches = [];
+    this._currentIdx = -1;
+  },
+
+  // ── Core search logic ───────────────────────────────────────
+  _runSearch(resetIdx = false) {
+    this._clearMarks();
+    this._matches = [];
+    this._currentIdx = -1;
+
+    const query = (this._panel?.querySelector('#srp-find')?.value) || '';
+    const countEl = this._panel?.querySelector('#srp-count');
+
+    if (!query || !this._cm) {
+      if (countEl) { countEl.textContent = ''; countEl.className = 'cm-search-count'; }
+      return;
+    }
+
+    const cm = this._cm;
+    const doc = cm.getDoc();
+    const content = cm.getValue();
+
+    // Case-insensitive search using SearchCursor (CM5 API)
+    try {
+      const cursor = cm.getSearchCursor(query, CodeMirror.Pos(0, 0), { caseFold: true });
+      while (cursor.findNext()) {
+        this._matches.push({ from: cursor.from(), to: cursor.to() });
+      }
+    } catch (e) {
+      // If query is invalid regex or throws, just try literal string
+      const lower = content.toLowerCase();
+      const qLower = query.toLowerCase();
+      let idx = 0;
+      while ((idx = lower.indexOf(qLower, idx)) !== -1) {
+        const from = doc.posFromIndex(idx);
+        const to   = doc.posFromIndex(idx + query.length);
+        this._matches.push({ from, to });
+        idx += query.length;
+      }
+    }
+
+    // Mark all matches with "all" class
+    for (const m of this._matches) {
+      const mark = cm.markText(m.from, m.to, { className: 'cm-search-match-all' });
+      this._marks.push({ mark, type: 'all' });
+    }
+
+    const total = this._matches.length;
+
+    if (total === 0) {
+      if (countEl) { countEl.textContent = 'no matches'; countEl.className = 'cm-search-count no-matches'; }
+      return;
+    }
+
+    // Navigate to nearest match from cursor
+    if (resetIdx) {
+      const cursorPos = cm.getCursor();
+      let nearest = 0;
+      let nearestDist = Infinity;
+      for (let i = 0; i < this._matches.length; i++) {
+        const dist = Math.abs(this._matches[i].from.line - cursorPos.line);
+        if (dist < nearestDist) { nearestDist = dist; nearest = i; }
+      }
+      this._currentIdx = nearest;
+    } else {
+      this._currentIdx = Math.max(0, Math.min(this._currentIdx, total - 1));
+    }
+
+    this._highlightCurrent(countEl, total);
+  },
+
+  _navigate(dir) {
+    if (this._matches.length === 0) { this._runSearch(false); return; }
+    this._currentIdx = (this._currentIdx + dir + this._matches.length) % this._matches.length;
+    const countEl = this._panel?.querySelector('#srp-count');
+    this._highlightCurrent(countEl, this._matches.length);
+  },
+
+  _highlightCurrent(countEl, total) {
+    if (this._currentIdx < 0 || this._currentIdx >= this._matches.length) return;
+
+    // Remove old "current" marks
+    this._marks = this._marks.filter(m => {
+      if (m.type === 'current') { m.mark.clear(); return false; }
+      return true;
+    });
+
+    const m = this._matches[this._currentIdx];
+    const mark = this._cm.markText(m.from, m.to, { className: 'cm-search-match-current' });
+    this._marks.push({ mark, type: 'current' });
+
+    // Scroll into view
+    this._cm.scrollIntoView({ from: m.from, to: m.to }, 80);
+
+    if (countEl) {
+      countEl.textContent = `${this._currentIdx + 1}/${total}`;
+      countEl.className = 'cm-search-count has-matches';
+    }
+  },
+
+  _clearMarks() {
+    for (const m of this._marks) m.mark.clear();
+    this._marks = [];
+  },
+
+  // ── Replace operations ──────────────────────────────────────
+  _replaceOne() {
+    if (this._matches.length === 0 || this._currentIdx < 0) return;
+    const replaceVal = this._panel?.querySelector('#srp-replace')?.value || '';
+    const m = this._matches[this._currentIdx];
+    this._cm.replaceRange(replaceVal, m.from, m.to);
+    // Re-search and stay at same index
+    this._runSearch(false);
+  },
+
+  _replaceAll() {
+    if (this._matches.length === 0) return;
+    const replaceVal = this._panel?.querySelector('#srp-replace')?.value || '';
+    const cm = this._cm;
+    // Replace from last to first to keep positions valid
+    const sorted = [...this._matches].reverse();
+    cm.operation(() => {
+      for (const m of sorted) {
+        cm.replaceRange(replaceVal, m.from, m.to);
+      }
+    });
+    const count = sorted.length;
+    this._runSearch(true);
+    Utils.showToast(`Replaced ${count} occurrence${count !== 1 ? 's' : ''}.`, 'info');
+  },
+
+  // ── Toggle: if panel is open for given cm, close; else open ──
+  toggle(cm, container) {
+    if (this._panel && this._cm === cm) {
+      this.close();
+    } else {
+      if (this._panel) this.close(); // close the old one first
+      this.open(cm, container);
+    }
+  },
+
+  _lastQuery: '',
 };
 
 // ─── Head Code Editor ─────────────────────────────────────────────────────────

@@ -46,6 +46,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   compileTailwind: (dirPath, configScript) =>
     ipcRenderer.invoke('tailwind:compile', { dirPath, configScript }),
 
+  // ── App Config persistence ─────────────────────────────────────────────────
+
+  // Load the persisted app config (projects/releases paths, etc.)
+  // Resolves to a plain object (empty {} if not yet saved)
+  loadConfig: () => ipcRenderer.invoke('config:load'),
+
+  // Save the app config; resolves to boolean
+  saveConfig: (data) => ipcRenderer.invoke('config:save', data),
+
   // ── App info ───────────────────────────────────────────────────────────────
 
   // Expose platform string so the renderer can adapt UI if needed

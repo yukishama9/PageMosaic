@@ -1,10 +1,151 @@
 /* ===== wb-project.js — Project Management ===== */
 
+// ── Electron native filesystem proxy ─────────────────────────────────────────
+// When running inside Electron, we use the native electronAPI instead of the
+// browser FileSystem Access API. This gives us real filesystem paths that can
+// be persisted across sessions via Electron's config store.
+//
+// ElectronDirHandle mimics the minimal FileSystemDirectoryHandle interface used
+// by FileHandler so the rest of the codebase works without changes.
+class ElectronDirHandle {
+  constructor(dirPath) {
+    this._path = dirPath;
+    this.name = dirPath.split(/[\\/]/).filter(Boolean).pop() || dirPath;
+    this.kind = 'directory';
+  }
+  // Internal helpers used by FileHandler-compatible shims
+  get fullPath() { return this._path; }
+}
+
+// Override key FileHandler methods to work with ElectronDirHandle
+// (called once at startup when Electron is detected)
+function patchFileHandlerForElectron() {
+  if (!window.electronAPI || FileHandler._electronPatched) return;
+  FileHandler._electronPatched = true;
+
+  const api = window.electronAPI;
+  const nodePath = { join: (...p) => p.join('/').replace(/\/+/g, '/') };
+
+  // Helper: resolve a handle (may be ElectronDirHandle or native FSHandle) to a path
+  const resolvePath = (handle) => handle instanceof ElectronDirHandle ? handle._path : null;
+
+  // Wrap the original methods — fall through to original if handle is not Electron
+  const origListEntries = FileHandler.listEntries.bind(FileHandler);
+  FileHandler.listEntries = async function(handle) {
+    const p = resolvePath(handle);
+    if (!p) return origListEntries(handle);
+    const entries = await api.listDir(p);
+    return entries.map(e => ({
+      name: e.name,
+      kind: e.kind,
+      fullPath: e.fullPath,
+      handle: e.kind === 'directory' ? new ElectronDirHandle(e.fullPath) : { name: e.name, _path: e.fullPath, kind: 'file', getFile: async () => ({ text: async () => api.readFile(e.fullPath) || '', arrayBuffer: async () => { const t = await api.readFile(e.fullPath); return new TextEncoder().encode(t || '').buffer; } }) },
+    }));
+  };
+
+  const origGetDir = FileHandler.getDir.bind(FileHandler);
+  FileHandler.getDir = async function(handle, name, create = false) {
+    const p = resolvePath(handle);
+    if (!p) return origGetDir(handle, name, create);
+    const fullPath = p.replace(/\\/g, '/') + '/' + name;
+    if (create) await api.mkdir(fullPath);
+    return new ElectronDirHandle(fullPath);
+  };
+
+  const origDirExists = FileHandler.dirExists.bind(FileHandler);
+  FileHandler.dirExists = async function(handle, name) {
+    const p = resolvePath(handle);
+    if (!p) return origDirExists(handle, name);
+    const fullPath = p.replace(/\\/g, '/') + '/' + name;
+    return api.exists(fullPath);
+  };
+
+  const origReadFile = FileHandler.readFile.bind(FileHandler);
+  FileHandler.readFile = async function(handle, filename) {
+    const p = resolvePath(handle);
+    if (!p) return origReadFile(handle, filename);
+    return api.readFile(p.replace(/\\/g, '/') + '/' + filename);
+  };
+
+  const origWriteFile = FileHandler.writeFile.bind(FileHandler);
+  FileHandler.writeFile = async function(handle, filename, content) {
+    const p = resolvePath(handle);
+    if (!p) return origWriteFile(handle, filename, content);
+    return api.writeFile(p.replace(/\\/g, '/') + '/' + filename, content);
+  };
+
+  const origWriteJSON = FileHandler.writeJSON.bind(FileHandler);
+  FileHandler.writeJSON = async function(handle, filename, obj) {
+    const p = resolvePath(handle);
+    if (!p) return origWriteJSON(handle, filename, obj);
+    return api.writeFile(p.replace(/\\/g, '/') + '/' + filename, JSON.stringify(obj, null, 2));
+  };
+
+  const origReadJSON = FileHandler.readJSON.bind(FileHandler);
+  FileHandler.readJSON = async function(handle, filename) {
+    const p = resolvePath(handle);
+    if (!p) return origReadJSON(handle, filename);
+    const raw = await api.readFile(p.replace(/\\/g, '/') + '/' + filename);
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch { return null; }
+  };
+
+  const origFileExists = FileHandler.fileExists.bind(FileHandler);
+  FileHandler.fileExists = async function(handle, filename) {
+    const p = resolvePath(handle);
+    if (!p) return origFileExists(handle, filename);
+    return api.exists(p.replace(/\\/g, '/') + '/' + filename);
+  };
+
+  const origDeleteFile = FileHandler.deleteFile.bind(FileHandler);
+  FileHandler.deleteFile = async function(handle, filename) {
+    const p = resolvePath(handle);
+    if (!p) return origDeleteFile(handle, filename);
+    return api.deleteFile(p.replace(/\\/g, '/') + '/' + filename);
+  };
+
+  // verifyPermission is a no-op for Electron handles (native FS is always accessible)
+  const origVerifyPermission = FileHandler.verifyPermission.bind(FileHandler);
+  FileHandler.verifyPermission = async function(handle, readWrite, silent) {
+    if (handle instanceof ElectronDirHandle) return true;
+    return origVerifyPermission(handle, readWrite, silent);
+  };
+
+  // persistHandle / restoreHandle are no-ops for Electron (we use config:save instead)
+  const origPersistHandle = FileHandler.persistHandle.bind(FileHandler);
+  FileHandler.persistHandle = async function(key, handle) {
+    if (handle instanceof ElectronDirHandle) return; // no-op; path already saved in config
+    return origPersistHandle(key, handle);
+  };
+
+  const origRestoreHandle = FileHandler.restoreHandle.bind(FileHandler);
+  FileHandler.restoreHandle = async function(key) {
+    const result = await origRestoreHandle(key);
+    // If nothing in IndexedDB, still return null — Electron paths come from config
+    return result;
+  };
+}
+
 const ProjectManager = {
 
   // ── Setup: get or init the projects/ and releases/ workspace handles ─────────
   async setupWorkspace() {
-    // Try to restore persisted handles.
+    // In Electron, patch FileHandler to use native FS and load saved paths from config
+    if (window.electronAPI) {
+      patchFileHandlerForElectron();
+      const cfg = await window.electronAPI.loadConfig().catch(() => ({}));
+      if (cfg.projectsPath && !State.workspaceProjectsHandle) {
+        const exists = await window.electronAPI.exists(cfg.projectsPath);
+        if (exists) State.workspaceProjectsHandle = new ElectronDirHandle(cfg.projectsPath);
+      }
+      if (cfg.releasesPath && !State.workspaceReleasesHandle) {
+        const exists = await window.electronAPI.exists(cfg.releasesPath);
+        if (exists) State.workspaceReleasesHandle = new ElectronDirHandle(cfg.releasesPath);
+      }
+      return !!(State.workspaceProjectsHandle && State.workspaceReleasesHandle);
+    }
+
+    // Browser (web) mode: use FileSystem Access API with IndexedDB handle persistence
     // Use silent=true — called on page load without a user gesture, so we must
     // only query permission (not prompt). If not already granted, the handle is
     // cleared and the user will be asked to re-select on next interaction.
@@ -25,6 +166,15 @@ const ProjectManager = {
 
   async pickProjectsFolder() {
     Utils.showToast('Select your "projects" folder…', 'info');
+
+    if (window.electronAPI) {
+      const dirPath = await window.electronAPI.openDirectory({ title: 'Select your "projects" folder' });
+      if (!dirPath) return false;
+      State.workspaceProjectsHandle = new ElectronDirHandle(dirPath);
+      await this._saveElectronConfig();
+      return true;
+    }
+
     const handle = await FileHandler.pickDirectory('wb-projects', 'documents');
     if (!handle) return false;
     const ok = await FileHandler.verifyPermission(handle);
@@ -36,6 +186,15 @@ const ProjectManager = {
 
   async pickReleasesFolder() {
     Utils.showToast('Select your "releases" folder…', 'info');
+
+    if (window.electronAPI) {
+      const dirPath = await window.electronAPI.openDirectory({ title: 'Select your "releases" folder' });
+      if (!dirPath) return false;
+      State.workspaceReleasesHandle = new ElectronDirHandle(dirPath);
+      await this._saveElectronConfig();
+      return true;
+    }
+
     const handle = await FileHandler.pickDirectory('wb-releases', 'documents');
     if (!handle) return false;
     const ok = await FileHandler.verifyPermission(handle);
@@ -43,6 +202,20 @@ const ProjectManager = {
     State.workspaceReleasesHandle = handle;
     await FileHandler.persistHandle('wb-releases-dir', handle);
     return true;
+  },
+
+  // Save Electron workspace paths (and any other config keys) to the native config file
+  async _saveElectronConfig(extra = {}) {
+    if (!window.electronAPI) return;
+    const existing = await window.electronAPI.loadConfig().catch(() => ({}));
+    const cfg = Object.assign({}, existing, {
+      projectsPath: State.workspaceProjectsHandle instanceof ElectronDirHandle
+        ? State.workspaceProjectsHandle._path : (existing.projectsPath || null),
+      releasesPath: State.workspaceReleasesHandle instanceof ElectronDirHandle
+        ? State.workspaceReleasesHandle._path : (existing.releasesPath || null),
+      ...extra,
+    });
+    await window.electronAPI.saveConfig(cfg);
   },
 
   // Ensure workspace is set up, prompting user if needed
