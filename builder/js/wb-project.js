@@ -1239,6 +1239,14 @@ const ProjectManager = {
             theme.colors[key] = val['DEFAULT'] || val['500'] || Object.values(val)[0] || '';
           }
         }
+        // Normalize all color keys to camelCase so they match what ThemeEditor and
+        // the sidebar swatches expect (e.g. 'primary-container' → 'primaryContainer')
+        const normalized = {};
+        for (const [k, v] of Object.entries(theme.colors)) {
+          const camel = k.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+          normalized[camel] = v;
+        }
+        theme.colors = normalized;
       } catch { /* invalid JS — skip */ }
     }
 
@@ -1253,13 +1261,20 @@ const ProjectManager = {
     }
 
     // ── Fonts: Google Fonts <link> ────────────────────────────────────────────
-    const gfRe = /fonts\.googleapis\.com\/css[^"']*family=([^"'&]+)/g;
+    // Supports both API v1 (family=Font+Name|Font+Name2) and
+    // API v2 (family=Font+Name:wght@400&family=Font+Name2:ital,wght@0,300)
     const fontFamilies = [];
-    let fm;
-    while ((fm = gfRe.exec(htmlContent)) !== null) {
-      const families = decodeURIComponent(fm[1]).split('|');
-      for (const f of families) {
-        const name = f.split(':')[0].replace(/\+/g, ' ').trim();
+    const gfUrlRe = /fonts\.googleapis\.com\/css2?[^"'\s]*/g;
+    let urlMatch;
+    while ((urlMatch = gfUrlRe.exec(htmlContent)) !== null) {
+      const url = urlMatch[0];
+      const familyRe = /[?&]family=([^&"'\s]+)/g;
+      let famMatch;
+      while ((famMatch = familyRe.exec(url)) !== null) {
+        // v2: "Noto+Serif:ital,wght@0,100..900" → split on ":" or "@"
+        // v1: "Noto+Serif:400,700" → split on ":"
+        const rawName = decodeURIComponent(famMatch[1]).split(/[:@]/)[0];
+        const name = rawName.replace(/\+/g, ' ').trim();
         if (name && !fontFamilies.includes(name)) fontFamilies.push(name);
       }
     }
@@ -1381,6 +1396,20 @@ const ProjectManager = {
 
   // ── Internal: load project data into State ───────────────────────────────────
   async _loadProject(handle, project) {
+    // Migrate legacy kebab-case color keys to camelCase (projects saved before v0.2.3)
+    if (project.theme?.colors) {
+      const colors = project.theme.colors;
+      const hasKebab = Object.keys(colors).some(k => k.includes('-'));
+      if (hasKebab) {
+        const normalized = {};
+        for (const [k, v] of Object.entries(colors)) {
+          const camel = k.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+          normalized[camel] = v;
+        }
+        project.theme.colors = normalized;
+      }
+    }
+
     State.projectHandle = handle;
     State.project = project;
     State.pages = project.pages || [];
