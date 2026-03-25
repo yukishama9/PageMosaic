@@ -295,6 +295,24 @@ const App = {
     UI.resolveImportConfirm(doSync);
   },
 
+  // ── Refresh page list by scanning project folder on disk ─────────────────────
+  async refreshPagesList() {
+    if (!State.project) {
+      Utils.showToast('Open or create a project first.', 'error'); return;
+    }
+    const result = await ProjectManager.refreshPagesList();
+    if (result) {
+      UI.renderPages();
+      const added = result.added;
+      Utils.showToast(
+        added > 0
+          ? `Refreshed: found ${added} new page(s). Total: ${result.total}.`
+          : `Page list up to date. ${result.total} page(s) found.`,
+        'info'
+      );
+    }
+  },
+
   // ── Import HTML pages into the currently open project ─────────────────────────
   async importPagesToProject() {
     if (!State.project) {
