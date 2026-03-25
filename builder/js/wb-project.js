@@ -1606,6 +1606,41 @@ const ProjectManager = {
     return State.workspaceReleasesHandle;
   },
 
+  // ── Refresh page list by scanning project folder on disk ─────────────────────
+  // Adds newly found .html files and removes entries whose files no longer exist.
+  // Does NOT overwrite existing page metadata (title, etc.).
+  async refreshPagesList() {
+    if (!State.projectHandle || !State.project) {
+      Utils.showToast('Open a project first.', 'error');
+      return false;
+    }
+
+    const entries = await FileHandler.listEntries(State.projectHandle);
+    const diskHtmlFiles = new Set(
+      entries
+        .filter(e => e.kind === 'file' && e.name.endsWith('.html'))
+        .map(e => e.name)
+    );
+
+    const before = State.pages.length;
+
+    // Remove pages whose files no longer exist on disk
+    State.pages = State.pages.filter(p => diskHtmlFiles.has(p.file));
+
+    // Add pages that exist on disk but aren't in the list yet
+    for (const filename of diskHtmlFiles) {
+      if (!State.pages.find(p => p.file === filename)) {
+        State.pages.push({ file: filename, title: Utils.basename(filename) });
+      }
+    }
+
+    State.project.pages = State.pages;
+    await this.saveProjectMeta();
+
+    const added = State.pages.length - before;
+    return { total: State.pages.length, added };
+  },
+
   // ── Import HTML pages into an existing open project ───────────────────────────
   // Copies HTML files (and assets/) from a selected source folder into the current
   // project directory and registers them as pages in project.json.
