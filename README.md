@@ -17,7 +17,10 @@ PageMosaic is a lightweight desktop tool for building and maintaining static HTM
 📥 **Import existing sites** — Auto-detects headers, footers, and cookie banners from any HTML folder.  
 📤 **Export** — Clean per-language output with metadata, OG tags, and custom head code injected automatically.  
 🤖 **Built-in AI assistant** — Streaming chat panel with Plan/Act modes; AI-generated code applies directly to the active editor.  
-🔌 **Skill & Agent system** — Extend the AI with reusable skills (e.g. HTML Cleanup) and custom agent personas.
+🔌 **Skill & Agent system** — Extend the AI with reusable skills (e.g. HTML Cleanup) and custom agent personas.  
+🪟 **Split view** — Toggle between Code, Preview, or side-by-side Split layout with a draggable resizer.  
+🔍 **Search & Replace** — Persistent Ctrl+F panel with real-time match highlighting, single and bulk replace.  
+💾 **Session persistence** — Desktop app remembers your last workspace paths across restarts.
 
 ![PageMosaic UI](https://raw.githubusercontent.com/yukishama9/PageMosaic/main/docs/assets/img/screenshot-01.png)
 
