@@ -200,6 +200,14 @@ const FileHandler = {
     await this.writeFile(dirHandle, filename, JSON.stringify(data, null, 2));
   },
 
+  // Write a binary file (ArrayBuffer) to a directory handle
+  async writeBinary(dirHandle, filename, arrayBuffer) {
+    const fh = await dirHandle.getFileHandle(filename, { create: true });
+    const writable = await fh.createWritable();
+    await writable.write(arrayBuffer);
+    await writable.close();
+  },
+
   // Delete a file
   async deleteFile(dirHandle, filename) {
     try {
