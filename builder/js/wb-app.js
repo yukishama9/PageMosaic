@@ -547,6 +547,18 @@ const App = {
     UI.openModal('modal-settings');
   },
 
+  // ── Auto-detect CSS mode from index.html and update the Settings dropdown ─────
+  async detectCssMode() {
+    if (!State.projectHandle) { Utils.showToast('Open a project first.', 'error'); return; }
+    const indexContent = await ProjectManager.readPage('index.html');
+    if (!indexContent) { Utils.showToast('No index.html found in project.', 'error'); return; }
+    const detected = ProjectManager._detectCssMode(indexContent);
+    const sel = document.getElementById('settings-css-mode');
+    if (sel) sel.value = detected;
+    const labels = { 'tailwind-cdn': 'Tailwind CDN', 'tailwind-local': 'Tailwind Local', 'custom': 'Custom CSS' };
+    Utils.showToast(`Detected: ${labels[detected] || detected}`, 'info');
+  },
+
   async saveSettings() {
     if (!State.project) return;
 

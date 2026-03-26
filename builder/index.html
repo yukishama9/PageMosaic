@@ -1100,11 +1100,17 @@
       <div style="border-top:1px solid #111118;margin:16px 0 12px"></div>
       <div class="form-field">
         <label>CSS Mode</label>
-        <select id="settings-css-mode">
-          <option value="tailwind-cdn">Tailwind CDN (default — config injected at runtime)</option>
-          <option value="tailwind-local">Tailwind Local (pre-compiled CSS, no CDN)</option>
-          <option value="custom">Custom CSS (no Tailwind, edit stylesheets directly)</option>
-        </select>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="settings-css-mode" style="flex:1">
+            <option value="tailwind-cdn">Tailwind CDN (default — config injected at runtime)</option>
+            <option value="tailwind-local">Tailwind Local (pre-compiled CSS, no CDN)</option>
+            <option value="custom">Custom CSS (no Tailwind, edit stylesheets directly)</option>
+          </select>
+          <button class="btn-sm" onclick="App.detectCssMode()" title="Auto-detect CSS mode from index.html" style="width:auto;flex-shrink:0;display:flex;align-items:center;gap:4px;padding:4px 10px">
+            <span class="material-symbols-outlined" style="font-size:13px">auto_fix_high</span>
+            Detect
+          </button>
+        </div>
         <small id="settings-css-mode-hint" style="color:#555;line-height:1.5;margin-top:4px;display:block"></small>
       </div>
       <div class="form-field">

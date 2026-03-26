@@ -171,12 +171,12 @@ const Preview = {
     const cssMode = State.project?.cssMode || 'tailwind-cdn';
     const theme = State.project?.theme;
     if (!exportCtx) {
-      // ── Preview mode: always use CDN so theme edits work in real-time ──────
-      // For 'tailwind-local' projects, swap the pre-compiled CSS link for the
-      // Tailwind CDN script so the injected config is processed by the runtime.
+      // ── Preview mode ──────────────────────────────────────────────────────
       if (theme && cssMode === 'tailwind-local') {
-        processed = ThemeEngine.swapLocalCssForCdn(processed);
-        processed = ThemeEngine.injectConfig(processed, theme);
+        // Keep the pre-compiled local CSS in place — _resolveLocalAssets() will
+        // convert the relative path to a blob:/file:// URL so it loads correctly
+        // in the srcdoc iframe. Only update Google Fonts to reflect theme fonts.
+        // (ThemeEditor's renderPageWithTheme handles CDN swap for live editing.)
         processed = ThemeEngine.injectFontsLink(processed, theme);
       } else if (theme && cssMode === 'tailwind-cdn') {
         processed = ThemeEngine.injectConfig(processed, theme);
@@ -895,15 +895,16 @@ const ThemeEngine = {
     return `tailwind.config = ${JSON.stringify(cfg, null, 2)}`;
   },
 
-  // ── Swap local Tailwind CSS link for CDN script (preview-only) ───────────────
-  // Removes any <link> tag referencing a local tailwind.css file and injects the
-  // Tailwind CDN <script> tag so that injectConfig() can take effect in preview.
-  // Only used in preview mode — export mode keeps the local CSS as-is.
+  // ── Swap local Tailwind CSS link for CDN script (ThemeEditor preview only) ──
+  // Removes local compiled CSS links and injects the Tailwind CDN <script> so
+  // that injectConfig() can take effect for live theme editing in ThemeEditor.
+  // NOT used for regular page preview — that uses _resolveLocalAssets() instead.
   swapLocalCssForCdn(html) {
-    // Remove local tailwind CSS links (e.g. assets/css/tailwind.css)
-    let result = html.replace(
-      /<link[^>]*href=["'][^"']*tailwind[^"']*\.css["'][^>]*>/gi, ''
-    );
+    let result = html
+      // Pattern 1: any CSS file with 'tailwind' in the name
+      .replace(/<link[^>]*href=["'][^"']*tailwind[^"']*\.css["'][^>]*>/gi, '')
+      // Pattern 2: any CSS file inside assets/css/ (html-localcss skill convention)
+      .replace(/<link[^>]*href=["'](?:\.\/)?assets\/css\/[^"']+\.css["'][^>]*>/gi, '');
 
     // If CDN script is already present, nothing more to do
     if (/cdn\.tailwindcss\.com/i.test(result)) return result;

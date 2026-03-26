@@ -1209,7 +1209,9 @@ const ProjectManager = {
   _detectCssMode(htmlContent) {
     if (!htmlContent) return 'custom';
     if (htmlContent.includes('cdn.tailwindcss.com')) return 'tailwind-cdn';
-    if (/assets\/css\/tailwind\.css/.test(htmlContent) ||
+    // Local Tailwind: any CSS in assets/css/, a file named tailwind*.css, or inline config script
+    if (/assets\/css\/[^"']*\.css/.test(htmlContent) ||
+        /tailwind[^"']*\.css/.test(htmlContent) ||
         /tailwind-config/.test(htmlContent)) return 'tailwind-local';
     return 'custom';
   },
@@ -1444,6 +1446,38 @@ const ProjectManager = {
     for (const lang of (project.languages || [])) {
       const data = i18nDir ? (await FileHandler.readJSON(i18nDir, `${lang.code}.json`) || {}) : {};
       State.i18nData[lang.code] = data;
+    }
+
+    // ── Auto-sync page list from disk ─────────────────────────────────────────
+    // Silently adds externally created/pasted pages; removes deleted ones.
+    try {
+      await this.refreshPagesList();
+    } catch (e) {
+      console.warn('[PageMosaic] Auto-refresh pages list failed:', e);
+    }
+
+    // ── Auto-detect CSS mode from index.html ──────────────────────────────────
+    // Keeps project.json in sync when the user converts the project externally
+    // (e.g. from Tailwind CDN to local CSS via the html-localcss skill).
+    try {
+      const indexContent = await FileHandler.readFile(handle, 'index.html');
+      if (indexContent) {
+        const detectedMode = this._detectCssMode(indexContent);
+        if (detectedMode !== State.project.cssMode) {
+          State.project.cssMode = detectedMode;
+          // Re-extract theme tokens if the mode changed (CDN→local or vice versa).
+          // Only overwrite the saved theme if we actually got non-empty colors back;
+          // local-CSS projects have no inline tailwind.config so extraction returns
+          // an empty colors object — we must NOT wipe the user's saved theme with that.
+          const detectedTheme = this._extractThemeFromHtml(indexContent);
+          if (detectedTheme && Object.keys(detectedTheme.colors || {}).length > 0) {
+            State.project.theme = detectedTheme;
+          }
+          await this.saveProjectMeta();
+        }
+      }
+    } catch (e) {
+      console.warn('[PageMosaic] Auto-detect CSS mode failed:', e);
     }
   },
 
@@ -1792,7 +1826,12 @@ const ProjectManager = {
     const reimportedCssMode = this._detectCssMode(indexHtmlContent);
     const reimportedTheme = this._extractThemeFromHtml(indexHtmlContent);
     if (reimportedCssMode) State.project.cssMode = reimportedCssMode;
-    if (reimportedTheme) State.project.theme = reimportedTheme;
+    // Only overwrite saved theme if extraction yielded non-empty colors.
+    // local-CSS projects have no inline tailwind.config, so extraction returns
+    // an empty colors object — preserve the user's saved theme in that case.
+    if (reimportedTheme && Object.keys(reimportedTheme.colors || {}).length > 0) {
+      State.project.theme = reimportedTheme;
+    }
 
     // Extract from index.html
     const extracted = await this._extractFromIndex(State.projectHandle, htmlFiles);
