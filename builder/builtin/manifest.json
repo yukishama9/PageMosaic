@@ -5,7 +5,8 @@
     { "id": "html-consist",  "type": "folder", "path": "skills/html-consist" },
     { "id": "html-copyright","type": "folder", "path": "skills/html-copyright" },
     { "id": "html-img-dl",   "type": "folder", "path": "skills/html-img-dl" },
-    { "id": "html-localcss", "type": "folder", "path": "skills/html-localcss" }
+    { "id": "html-localcss",   "type": "folder", "path": "skills/html-localcss" },
+    { "id": "design-import",   "type": "folder", "path": "skills/design-import" }
   ],
   "agents": [
     { "id": "pagemosaic-webdev", "type": "md", "path": "agents/pagemosaic-webdev.agent.md" }

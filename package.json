@@ -1,6 +1,6 @@
 {
   "name": "pagemosaic",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Visual static-site editor for reusable components and multi-language static websites",
   "main": "electron/main.js",
   "homepage": "https://github.com/yukishama9/pagemosaic",

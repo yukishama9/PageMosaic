@@ -717,6 +717,27 @@ They are injected only at export — NOT in preview. Do not suggest adding analy
         }
       }
     }
+
+    // design-import skill: auto-detect JSON and apply to ThemeEditor
+    if (text.trim() && this._activeSkill === 'design-import') {
+      try {
+        const applied = typeof ThemeEditor !== 'undefined' && ThemeEditor.applyDesignJson
+          ? ThemeEditor._extractDesignJson(text)
+          : null;
+        if (applied) {
+          // Ensure ThemeEditor is open so controls exist
+          if (typeof ThemeEditor !== 'undefined') {
+            if (!document.getElementById('view-theme-editor')?.classList.contains('hidden') === false) {
+              ThemeEditor.open();
+            }
+            ThemeEditor.applyDesignJson(applied);
+            Utils.showToast(`✓ Design tokens applied to Theme Editor — click Save Theme to persist.`, 'info', 4500);
+          }
+        }
+      } catch (e) {
+        console.warn('[AiChat] design-import auto-apply failed:', e);
+      }
+    }
   },
 
   _finalizeStreamingBubbleError(errMsg) {

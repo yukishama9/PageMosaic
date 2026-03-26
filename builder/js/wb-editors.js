@@ -1180,6 +1180,227 @@ const ThemeEditor = {
       summaryEl.textContent = `${headline} / ${body} · ${radius}`;
     }
   },
+
+  // ── Import Design System ─────────────────────────────────────────────────────
+  // Stored pending parsed JSON from AI response
+  _pendingDesignJson: null,
+
+  openImportDesign() {
+    // Reset modal state
+    this._pendingDesignJson = null;
+    const ta = document.getElementById('import-design-textarea');
+    if (ta) ta.value = '';
+    const fn = document.getElementById('import-design-filename');
+    if (fn) fn.textContent = '';
+    const status = document.getElementById('import-design-status');
+    if (status) { status.style.display = 'none'; status.innerHTML = ''; }
+    const preview = document.getElementById('import-design-preview');
+    if (preview) preview.style.display = 'none';
+    const btnParse = document.getElementById('btn-import-design-parse');
+    if (btnParse) btnParse.style.display = '';
+    const btnApply = document.getElementById('btn-import-design-apply');
+    if (btnApply) btnApply.style.display = 'none';
+    UI.openModal('modal-import-design');
+  },
+
+  _importDesignPickFile() {
+    document.getElementById('import-design-file-input')?.click();
+  },
+
+  _importDesignOnFileChange(input) {
+    const file = input?.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const ta = document.getElementById('import-design-textarea');
+      if (ta) ta.value = e.target.result || '';
+      const fn = document.getElementById('import-design-filename');
+      if (fn) fn.textContent = file.name;
+    };
+    reader.readAsText(file);
+  },
+
+  async _importDesignParse() {
+    const ta = document.getElementById('import-design-textarea');
+    const doc = ta?.value?.trim();
+    if (!doc) {
+      Utils.showToast('Please paste or load a Design System document first.', 'warn');
+      return;
+    }
+
+    // Check AI availability
+    if (!AiProvider || !AiProvider.config?.apiKey) {
+      Utils.showToast('Please configure your AI API key in AI Settings first.', 'error');
+      return;
+    }
+
+    // Find the design-import skill prompt
+    const skillData = (window.__BUILTIN_DATA__?.skills || []).find(s => s.id === 'design-import');
+    if (!skillData) {
+      Utils.showToast('design-import skill not found.', 'error');
+      return;
+    }
+
+    const statusEl = document.getElementById('import-design-status');
+    const previewEl = document.getElementById('import-design-preview');
+    const btnParse = document.getElementById('btn-import-design-parse');
+    const btnApply = document.getElementById('btn-import-design-apply');
+
+    if (statusEl) {
+      statusEl.style.display = 'block';
+      statusEl.innerHTML = '<span style="color:#a78bfa;font-size:11px">⟳ Sending to AI… this may take a few seconds.</span>';
+    }
+    if (btnParse) btnParse.disabled = true;
+
+    try {
+      const messages = [
+        { role: 'system', content: skillData.prompt },
+        { role: 'user',   content: `Here is the Design System document to parse:\n\n${doc}` },
+      ];
+
+      // Use chatWithMode streaming, collect full text
+      const raw = await new Promise((resolve, reject) => {
+        let fullText = '';
+        AiProvider.chatWithMode('act', messages, {
+          onToken: (t) => { fullText += t; },
+          onDone:  () => resolve(fullText),
+          onError: (e) => reject(new Error(e)),
+        });
+      });
+      const json = this._extractDesignJson(raw);
+
+      if (!json) {
+        if (statusEl) statusEl.innerHTML = '<span style="color:#f97316;font-size:11px">⚠ Could not extract valid JSON from the AI response. Try again or check the document format.</span>';
+        if (btnParse) btnParse.disabled = false;
+        return;
+      }
+
+      this._pendingDesignJson = json;
+      this._showDesignPreview(json);
+
+      if (statusEl) {
+        statusEl.innerHTML = `<span style="color:#4ade80;font-size:11px">✓ Parsed: <strong style="color:#ccc">${json.design_system_name || 'Design System'}</strong>${json.notes ? ` — ${json.notes}` : ''}</span>`;
+      }
+      if (previewEl) previewEl.style.display = 'block';
+      if (btnParse) { btnParse.disabled = false; btnParse.style.display = 'none'; }
+      if (btnApply) btnApply.style.display = '';
+
+    } catch (err) {
+      console.error('[ImportDesign] AI error:', err);
+      if (statusEl) statusEl.innerHTML = `<span style="color:#f97316;font-size:11px">⚠ AI error: ${err.message || err}</span>`;
+      if (btnParse) btnParse.disabled = false;
+    }
+  },
+
+  _extractDesignJson(text) {
+    // Find the first ```json ... ``` block
+    const fenced = text.match(/```json\s*([\s\S]*?)```/i);
+    const candidate = fenced ? fenced[1] : text;
+    try {
+      const obj = JSON.parse(candidate.trim());
+      // Validate required fields
+      if (obj && obj.colors && obj.fonts && obj.radius) return obj;
+    } catch { /* fall through */ }
+    // Try to find bare JSON object in the text
+    const bare = text.match(/\{[\s\S]*"colors"[\s\S]*"fonts"[\s\S]*"radius"[\s\S]*\}/);
+    if (bare) {
+      try { return JSON.parse(bare[0]); } catch { /* ignore */ }
+    }
+    return null;
+  },
+
+  /**
+   * Public entry point: apply a parsed design JSON directly (called from AI Chat).
+   */
+  applyDesignJson(json) {
+    if (!json || !json.colors || !json.fonts || !json.radius) return false;
+    this._pendingDesignJson = json;
+    this._applyPendingToControls();
+    return true;
+  },
+
+  _importDesignApply() {
+    if (!this._pendingDesignJson) return;
+    this._applyPendingToControls();
+    UI.closeModal('modal-import-design');
+    Utils.showToast('Design tokens applied — review and click Save Theme to persist.', 'info', 4000);
+  },
+
+  _applyPendingToControls() {
+    const json = this._pendingDesignJson;
+    if (!json) return;
+
+    // Apply colors
+    const colorMap = {
+      primary:          'primary',
+      primaryContainer: 'primaryContainer',
+      surface:          'surface',
+      onSurface:        'onSurface',
+      secondary:        'secondary',
+    };
+    Object.entries(colorMap).forEach(([key, id]) => {
+      const val = json.colors?.[key];
+      if (!val) return;
+      const picker = document.getElementById(`te-color-${id}`);
+      const hex    = document.getElementById(`te-color-${id}-hex`);
+      if (picker) picker.value = val;
+      if (hex)    hex.value   = val;
+    });
+
+    // Apply fonts (best-effort select matching)
+    const fontMap = { headline: 'headline', body: 'body', label: 'label' };
+    Object.entries(fontMap).forEach(([key, id]) => {
+      const fontName = json.fonts?.[key];
+      if (!fontName) return;
+      const sel = document.getElementById(`te-font-${id}`);
+      if (!sel) return;
+      // Try exact match first, then case-insensitive
+      const opts = Array.from(sel.options);
+      const exact = opts.find(o => o.value === fontName);
+      const icase = opts.find(o => o.value.toLowerCase() === fontName.toLowerCase());
+      if (exact || icase) {
+        sel.value = (exact || icase).value;
+      }
+      // If no match, add a temporary option so the value is visible
+      else {
+        const opt = document.createElement('option');
+        opt.value = fontName;
+        opt.textContent = fontName + ' (custom)';
+        sel.appendChild(opt);
+        sel.value = fontName;
+      }
+    });
+
+    // Apply radius
+    if (json.radius) this.onRadiusSelect(json.radius);
+
+    // Trigger live preview update
+    this.onColorChange();
+  },
+
+  _showDesignPreview(json) {
+    const swatchWrap = document.getElementById('import-design-preview-swatches');
+    const fontsWrap  = document.getElementById('import-design-preview-fonts');
+    if (swatchWrap && json.colors) {
+      const order = ['surface', 'primary', 'primaryContainer', 'secondary', 'onSurface'];
+      swatchWrap.innerHTML = order.map(k => {
+        const c = json.colors[k] || '#333';
+        const label = k.replace(/([A-Z])/g, ' $1');
+        return `<div title="${label}: ${c}" style="display:flex;flex-direction:column;align-items:center;gap:3px">
+          <div style="width:28px;height:28px;border-radius:4px;background:${c};border:1px solid rgba(255,255,255,.1)"></div>
+          <span style="font-size:9px;color:#555;max-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c}</span>
+        </div>`;
+      }).join('');
+    }
+    if (fontsWrap && json.fonts) {
+      fontsWrap.innerHTML = [
+        `Headline: <strong style="color:#ccc">${json.fonts.headline || '–'}</strong>`,
+        `Body: <strong style="color:#ccc">${json.fonts.body || '–'}</strong>`,
+        `Label: <strong style="color:#ccc">${json.fonts.label || '–'}</strong>`,
+        `Shape: <strong style="color:#ccc">${json.radius || '–'}</strong>`,
+      ].join(' &nbsp;·&nbsp; ');
+    }
+  },
 };
 
 // ─── Search / Replace Panel ───────────────────────────────────────────────────

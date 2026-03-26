@@ -423,6 +423,10 @@
           Theme Editor
         </span>
         <div class="toolbar-spacer"></div>
+        <button class="toolbar-btn" onclick="ThemeEditor.openImportDesign()" title="Import design tokens from a Design System document (Markdown)">
+          <span class="material-symbols-outlined">style</span>
+          <span>Import Design</span>
+        </button>
         <button class="toolbar-btn btn-save" id="btn-save-theme" onclick="ThemeEditor.save()">
           <span class="material-symbols-outlined">save</span>
           <span>Save Theme</span>
@@ -1231,6 +1235,66 @@
     </div>
     <div class="modal-footer">
       <button class="btn-secondary" onclick="UI.closeModal('modal-app-settings')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Import Design System -->
+<div id="modal-import-design" class="modal-backdrop hidden">
+  <div class="modal" style="max-width:640px;width:95vw">
+    <div class="modal-header">
+      <span class="modal-title">
+        <span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;color:#a78bfa">style</span>
+        Import Design System
+      </span>
+      <button class="modal-close" onclick="UI.closeModal('modal-import-design')">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div style="background:#0a0a14;border:1px solid #1a1a2e;border-radius:8px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:flex-start;gap:10px">
+        <span class="material-symbols-outlined" style="font-size:15px;color:#a78bfa;flex-shrink:0;margin-top:1px">info</span>
+        <div style="font-size:11px;color:#888;line-height:1.6">
+          Paste or load a Design System document (Google Stitch / Material Design Markdown format).
+          The AI will extract <strong style="color:#ccc">colors, fonts and shape</strong> and apply them to your theme automatically.
+          <br><span style="color:#555">Requires AI to be configured with a valid API key.</span>
+        </div>
+      </div>
+
+      <!-- File picker -->
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+        <button class="btn-sm" onclick="ThemeEditor._importDesignPickFile()" style="width:auto;display:flex;align-items:center;gap:5px;padding:4px 12px;flex-shrink:0">
+          <span class="material-symbols-outlined" style="font-size:13px">upload_file</span>
+          Load .md / .txt file
+        </button>
+        <span id="import-design-filename" style="font-size:11px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+        <input type="file" id="import-design-file-input" accept=".md,.txt,.markdown" style="display:none"
+               onchange="ThemeEditor._importDesignOnFileChange(this)">
+      </div>
+
+      <!-- Text area -->
+      <textarea id="import-design-textarea"
+        style="width:100%;box-sizing:border-box;height:220px;background:#0d0d18;border:1px solid #2a2a36;border-radius:6px;color:#ccc;font-family:monospace;font-size:11px;padding:10px 12px;resize:vertical;outline:none;line-height:1.5"
+        placeholder="Paste your Design System document here…&#10;&#10;Example excerpt:&#10;## Colors&#10;- Primary (#ffb3af): Rose accent…&#10;## Typography&#10;- Display: Noto Serif&#10;- Body: Manrope"></textarea>
+
+      <!-- Status / result preview -->
+      <div id="import-design-status" style="margin-top:10px;display:none"></div>
+      <div id="import-design-preview" style="margin-top:10px;display:none">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555;margin-bottom:8px">Extracted Theme Preview</div>
+        <div id="import-design-preview-swatches" style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap"></div>
+        <div id="import-design-preview-fonts" style="font-size:11px;color:#888;line-height:1.8"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="UI.closeModal('modal-import-design')">Cancel</button>
+      <button id="btn-import-design-parse" class="btn-primary" onclick="ThemeEditor._importDesignParse()">
+        <span class="material-symbols-outlined" style="font-size:15px">auto_awesome</span>
+        Parse with AI
+      </button>
+      <button id="btn-import-design-apply" class="btn-primary" style="display:none" onclick="ThemeEditor._importDesignApply()">
+        <span class="material-symbols-outlined" style="font-size:15px">check</span>
+        Apply to Theme
+      </button>
     </div>
   </div>
 </div>

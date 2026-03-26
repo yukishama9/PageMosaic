@@ -14,6 +14,7 @@ PageMosaic is a lightweight desktop tool for building and maintaining static HTM
 🧩 **Component-based editing** — Edit a component once, every page updates automatically.  
 🌍 **Multi-language (i18n)** — Spreadsheet-style translation editor with missing-key highlighting.  
 🎨 **Theme editor** — Visual color, font, and shape controls with Tailwind CDN / Local / Custom CSS modes.  
+📐 **Import Design System** — Paste a Google Stitch Design file, Figma token export, or brand guide; AI parses it into theme colors, fonts, and shapes instantly.  
 🖼 **Live preview** — Desktop / Tablet / Mobile switcher with per-language, instant hot-reload preview.  
 📥 **Import existing sites** — Auto-detects headers, footers, and cookie banners from any HTML folder.  
 📤 **Export** — Clean per-language output with metadata, OG tags, and custom head code injected automatically.  
