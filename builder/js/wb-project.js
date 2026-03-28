@@ -15,6 +15,56 @@ class ElectronDirHandle {
   }
   // Internal helpers used by FileHandler-compatible shims
   get fullPath() { return this._path; }
+
+  // ── FSA compatibility stubs ──────────────────────────────────────────────────
+  // Some code paths (e.g. _resolveLocalAssets in wb-preview.js) fall through to
+  // the original FileSystem Access API. These stubs route those calls through the
+  // Electron IPC bridge so they work correctly in the desktop build.
+
+  async getFileHandle(filename, { create: _create = false } = {}) {
+    const filePath = (this._path + '/' + filename).replace(/\\/g, '/');
+    const api = window.electronAPI;
+    return {
+      name: filename,
+      kind: 'file',
+      getFile: async () => {
+        const text = await api.readFile(filePath) || '';
+        return {
+          text: async () => text,
+          arrayBuffer: async () => new TextEncoder().encode(text).buffer,
+        };
+      },
+      createWritable: async () => {
+        const chunks = [];
+        return {
+          write: async (data) => {
+            chunks.push(typeof data === 'string' ? data : new TextDecoder().decode(data));
+          },
+          close: async () => {
+            await api.writeFile(filePath, chunks.join(''));
+          },
+        };
+      },
+    };
+  }
+
+  async getDirectoryHandle(name, { create = false } = {}) {
+    const subPath = (this._path + '/' + name).replace(/\\/g, '/');
+    if (create) await window.electronAPI.mkdir(subPath);
+    return new ElectronDirHandle(subPath);
+  }
+
+  // entries() iterator — used by FileHandler.listEntries fallback
+  async *entries() {
+    const api = window.electronAPI;
+    const list = await api.listDir(this._path.replace(/\\/g, '/'));
+    for (const e of list) {
+      const handle = e.kind === 'directory'
+        ? new ElectronDirHandle(e.fullPath)
+        : { name: e.name, kind: 'file', _path: e.fullPath, getFile: async () => ({ text: async () => api.readFile(e.fullPath) || '', arrayBuffer: async () => { const t = await api.readFile(e.fullPath); return new TextEncoder().encode(t || '').buffer; } }) };
+      yield [e.name, handle];
+    }
+  }
 }
 
 // Override key FileHandler methods to work with ElectronDirHandle
@@ -1154,6 +1204,8 @@ const ProjectManager = {
   },
 
   // ── Recursively copy a directory ──────────────────────────────────────────────
+  // Electron mode: uses native fs:copyFile for all files (avoids binary corruption).
+  // Browser (FSA) mode: reads binary files as ArrayBuffer, text files as string.
   async _copyDirRecursive(srcDir, destDir, entries) {
     const entriesToCopy = entries || await FileHandler.listEntries(srcDir);
     for (const entry of entriesToCopy) {
@@ -1161,22 +1213,32 @@ const ProjectManager = {
         // Skip hidden files and webbuilder internal files
         if (entry.name.startsWith('.')) continue;
         if (entry.name === 'project.json') continue; // will create fresh
-        const file = await entry.handle.getFile();
-        // Handle binary vs text files
-        const isBinary = /\.(png|jpg|jpeg|gif|webp|svg|ico|woff|woff2|ttf|eot|pdf|mp4|mp3|webm)$/i.test(entry.name);
-        if (isBinary) {
-          const buf = await file.arrayBuffer();
-          await FileHandler.writeBinary(destDir, entry.name, buf);
+
+        // ── Electron: use native copyFile (avoids text-encoding corruption) ──
+        if (window.electronAPI && entry.fullPath && destDir._path) {
+          const destPath = destDir._path.replace(/\\/g, '/') + '/' + entry.name;
+          await window.electronAPI.copyFile(entry.fullPath, destPath);
+
         } else {
-          const text = await file.text();
-          await FileHandler.writeFile(destDir, entry.name, text);
+          // ── Browser FSA mode ──────────────────────────────────────────────
+          const file = await entry.handle.getFile();
+          const isBinary = /\.(png|jpg|jpeg|gif|webp|svg|ico|woff|woff2|ttf|eot|pdf|mp4|mp3|webm)$/i.test(entry.name);
+          if (isBinary) {
+            const buf = await file.arrayBuffer();
+            await FileHandler.writeBinary(destDir, entry.name, buf);
+          } else {
+            const text = await file.text();
+            await FileHandler.writeFile(destDir, entry.name, text);
+          }
         }
+
       } else if (entry.kind === 'directory') {
         // Skip already-created webbuilder dirs
         if (['components', 'shared-data', 'i18n'].includes(entry.name)) continue;
         const subDest = await FileHandler.getDir(destDir, entry.name, true);
-        const subEntries = await FileHandler.listEntries(entry.handle);
-        await this._copyDirRecursive(entry.handle, subDest, subEntries);
+        const subHandle = entry.handle instanceof ElectronDirHandle ? entry.handle : entry.handle;
+        const subEntries = await FileHandler.listEntries(subHandle);
+        await this._copyDirRecursive(subHandle, subDest, subEntries);
       }
     }
   },
@@ -1460,6 +1522,18 @@ const ProjectManager = {
       State.i18nData[lang.code] = data;
     }
 
+    // ── Snapshot base language i18n for real-time preview overlay ─────────────
+    // Build the snapshot by TEXT-SCANNING actual HTML files (not by copying the i18n
+    // JSON values). This ensures snapshot[key] = "text currently in the HTML file",
+    // even if the user edited the i18n database without syncing to HTML.
+    //
+    // _applyI18nOverlay Mode A uses:  from = snapshot[key],  to = currentData[key]
+    // If snapshot differs from currentData, the DOM walker finds the original HTML
+    // text and replaces it with the user's edited value during export.
+    //
+    // Must be set AFTER all i18nData and pages/components are loaded above.
+    await this._buildI18nSnapshot(project);
+
     // ── Auto-sync page list from disk ─────────────────────────────────────────
     // Silently adds externally created/pasted pages; removes deleted ones.
     try {
@@ -1491,6 +1565,76 @@ const ProjectManager = {
     } catch (e) {
       console.warn('[PageMosaic] Auto-detect CSS mode failed:', e);
     }
+  },
+
+  // ── Build i18n snapshot from actual HTML file content ────────────────────────
+  // Scans each component and page HTML (raw, before component injection) using
+  // the same TextScanner._scanHtml key-generation algorithm.  The resulting
+  // map is { i18nKey: "text actually in the HTML file" } — this may differ from
+  // State.i18nData[baseLang] when the user has edited keys in the Language Editor
+  // without running "Sync Strings to HTML".
+  //
+  // Used by _applyI18nOverlay Mode A (base-language export):
+  //   from = snapshot[key]     ← original text found in the HTML
+  //   to   = currentData[key]  ← user-edited i18n value
+  // If they differ, the DOM walker replaces the old text with the new one.
+  async _buildI18nSnapshot(project) {
+    const baseLang = project.baseLanguage;
+    if (!baseLang) {
+      State._i18nOriginalSnapshot = {};
+      return;
+    }
+
+    const baseLangData = State.i18nData[baseLang] || {};
+    const htmlSnapshot = {};
+    // Shared seenText set — mirrors how TextScanner.scan() deduplicates across
+    // components and pages in a single pass.
+    const seenText = new Set();
+
+    // 1. Scan component HTML (comp.* keys)
+    for (const [compId, comp] of Object.entries(State.components || {})) {
+      if (!comp.html) continue;
+      const entries = TextScanner._scanHtml(comp.html, `comp.${compId}`, seenText, 'global');
+      for (const entry of entries) {
+        // Only record keys that exist in the i18n database
+        if (baseLangData[entry.key] !== undefined) {
+          htmlSnapshot[entry.key] = entry.text;
+        }
+      }
+    }
+
+    // 2. Scan each page's raw HTML body (page.* keys)
+    //    Strip full @component blocks first — same as TextScanner.scan() does —
+    //    so component text doesn't get double-counted with different key names.
+    for (const page of (State.pages || [])) {
+      const html = await this.readPage(page.file);
+      if (!html) continue;
+      const basename = Utils.pageName(page.file);
+      const stripped = html.replace(
+        /<!--\s*@component:[^>]+-->([\s\S]*?)<!--\s*\/@component:[^>]+-->/g, ''
+      );
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(stripped, 'text/html');
+      const bodyEl = doc.body;
+      if (!bodyEl) continue;
+      const entries = TextScanner._scanHtml(bodyEl.innerHTML, `page.${basename}`, seenText, 'page');
+      for (const entry of entries) {
+        if (baseLangData[entry.key] !== undefined) {
+          htmlSnapshot[entry.key] = entry.text;
+        }
+      }
+    }
+
+    // 3. For any key NOT found in the HTML scan (e.g. {{t:...}} template tokens,
+    //    meta fields, or keys added after the last scan), fall back to the current
+    //    i18n database value so the overlay gracefully skips them (from === to).
+    for (const [key, val] of Object.entries(baseLangData)) {
+      if (htmlSnapshot[key] === undefined) {
+        htmlSnapshot[key] = val;
+      }
+    }
+
+    State._i18nOriginalSnapshot = htmlSnapshot;
   },
 
   // ── Save project.json ─────────────────────────────────────────────────────────
@@ -1622,6 +1766,9 @@ const ProjectManager = {
   async saveI18n(lang) {
     const i18nDir = await FileHandler.getDir(State.projectHandle, 'i18n', true);
     await FileHandler.writeJSON(i18nDir, `${lang}.json`, State.i18nData[lang] || {});
+    // NOTE: _i18nOriginalSnapshot is intentionally NOT updated here.
+    // The snapshot represents what is currently written into the HTML files.
+    // It is only updated by _loadProject() (on open) and syncStringsToHtml() (after sync).
   },
 
   // ── Utilities ─────────────────────────────────────────────────────────────────

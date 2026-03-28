@@ -604,7 +604,20 @@ const I18nEditor = {
       keys = keys.filter(k => !data[k]);
     }
 
-    let html = `<table class="i18n-table">
+    // ── Sync bar: only shown for base language ────────────────────────────────
+    let html = '';
+    if (isBase) {
+      html += `<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#0a100a;border:1px solid #14542a;border-radius:6px;margin-bottom:12px">
+        <span class="material-symbols-outlined" style="font-size:15px;color:#4ade80;flex-shrink:0">sync</span>
+        <span style="font-size:11px;color:#555;flex:1">Edit base language strings, then click <strong style="color:#888">Sync</strong> to write changes to the project HTML files.</span>
+        <button onclick="I18nEditor.syncStringsToHtml()" style="display:flex;align-items:center;gap:5px;padding:5px 12px;background:#0d2610;border:1px solid #166534;border-radius:4px;color:#4ade80;font-size:11px;cursor:pointer;white-space:nowrap;font-family:inherit">
+          <span class="material-symbols-outlined" style="font-size:13px">update</span>
+          Sync Strings to HTML
+        </button>
+      </div>`;
+    }
+
+    html += `<table class="i18n-table">
       <thead><tr>
         <th style="width:200px">Key</th>
         ${!isBase ? `<th>${Utils.escapeHtml(baseLang)} (base)</th>` : ''}
@@ -661,6 +674,8 @@ const I18nEditor = {
         input.classList.toggle('missing', !input.value && !isBase);
         this._updateMissingCount();
         UI.renderLanguages(); // refresh progress badges
+        // Note: base-language edits are written to disk via "Sync Strings to HTML" button.
+        // Non-base language preview refreshes automatically on Save (I18nEditor.save()).
       });
     });
   },
@@ -891,6 +906,125 @@ const I18nEditor = {
     Utils.showToast(`Saved translations: ${this._lang}`, 'info');
     UI.renderLanguages();
     Preview.renderCurrentPage();
+  },
+
+  // ── Sync base-language string edits → project HTML files ─────────────────────
+  // Compares current i18nData[baseLang] against the snapshot saved at project load
+  // (or last sync). Changed strings are applied via DOM-level replacement to each
+  // affected HTML page, which is then written back to disk.
+  // If a changed page is currently open in the code editor, CodeMirror is refreshed.
+  async syncStringsToHtml() {
+    const baseLang = State.project?.baseLanguage;
+    if (!baseLang || !State.projectHandle) {
+      Utils.showToast('Open a project first.', 'error');
+      return;
+    }
+
+    const snapshot = State._i18nOriginalSnapshot || {};
+    const currentData = State.i18nData[baseLang] || {};
+
+    // Build list of (oldText → newText) pairs for changed keys
+    const replacements = [];
+    for (const [key, originalText] of Object.entries(snapshot)) {
+      if (!originalText || typeof originalText !== 'string') continue;
+      const newText = currentData[key];
+      if (!newText || typeof newText !== 'string' || !newText.trim()) continue;
+      if (newText === originalText) continue; // unchanged
+      replacements.push({ from: originalText, to: newText });
+    }
+
+    if (replacements.length === 0) {
+      Utils.showToast('No changes detected since last sync.', 'info');
+      return;
+    }
+
+    // Sort longest-first to prevent shorter strings from corrupting longer ones
+    replacements.sort((a, b) => b.from.length - a.from.length);
+
+    // Build a normalised lookup map (exact + whitespace-collapsed variants)
+    const lookupMap = new Map();
+    for (const { from, to } of replacements) {
+      lookupMap.set(from, to);
+      const norm = from.replace(/\s+/g, ' ').trim();
+      if (norm !== from) lookupMap.set(norm, to);
+    }
+
+    const SKIP_TAGS = new Set(['script', 'style', 'pre', 'code', 'noscript', 'template', 'svg', 'math']);
+    const ATTR_TARGETS = ['alt', 'title', 'placeholder', 'aria-label'];
+    const currentPageFile = PageEditor.getCurrentFilename();
+    let updatedPages = 0;
+
+    // Process each page
+    for (const page of State.pages) {
+      const html = await ProjectManager.readPage(page.file);
+      if (!html) continue;
+
+      // Quick check: skip pages that contain none of the changed strings
+      const hasChange = replacements.some(r => html.includes(r.from));
+      if (!hasChange) continue;
+
+      // DOM-level replacement
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+
+      const walk = (node) => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const tag = node.tagName.toLowerCase();
+          if (SKIP_TAGS.has(tag)) return;
+
+          // Replace matching attribute values
+          for (const attr of ATTR_TARGETS) {
+            const val = node.getAttribute(attr);
+            if (!val) continue;
+            const norm = val.replace(/\s+/g, ' ').trim();
+            if (lookupMap.has(val))       node.setAttribute(attr, lookupMap.get(val));
+            else if (lookupMap.has(norm)) node.setAttribute(attr, lookupMap.get(norm));
+          }
+
+          for (const child of Array.from(node.childNodes)) walk(child);
+        } else if (node.nodeType === Node.TEXT_NODE) {
+          const text = node.textContent;
+          const norm = text.replace(/\s+/g, ' ').trim();
+          if (!norm) return;
+
+          let replacement = null;
+          if (lookupMap.has(text)) {
+            replacement = lookupMap.get(text);
+          } else if (lookupMap.has(norm)) {
+            // Preserve surrounding whitespace
+            const leading  = text.match(/^\s*/)[0];
+            const trailing = text.match(/\s*$/)[0];
+            replacement = leading + lookupMap.get(norm) + trailing;
+          }
+          if (replacement !== null) node.textContent = replacement;
+        }
+      };
+
+      walk(doc.documentElement);
+
+      const newHtml = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+      await ProjectManager.savePage(page.file, newHtml);
+      updatedPages++;
+
+      // If this page is currently open in the code editor, refresh CodeMirror
+      if (page.file === currentPageFile && State.pageCodeMirror) {
+        const scrollInfo = State.pageCodeMirror.getScrollInfo();
+        State.pageCodeMirror.setValue(newHtml);
+        State.pageCodeMirror.clearHistory();
+        State.pageCodeMirror.scrollTo(scrollInfo.left, scrollInfo.top);
+        UI.setDirty(`page:${currentPageFile}`, false);
+        Preview.renderCurrentPage();
+      }
+    }
+
+    // Rebuild snapshot from actual HTML content so the next export/sync
+    // correctly detects changes relative to what's now written to disk.
+    await ProjectManager._buildI18nSnapshot(State.project);
+
+    const msg = updatedPages > 0
+      ? `Synced ${replacements.length} string change(s) across ${updatedPages} page(s).`
+      : `No pages contained the changed strings (${replacements.length} changes recorded in snapshot).`;
+    Utils.showToast(msg, 'info', 4000);
   },
 };
 

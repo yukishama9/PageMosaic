@@ -271,6 +271,83 @@ const App = {
     }
   },
 
+  // ── Rebuild All Pages ──────────────────────────────────────────────────────────
+  // Re-injects the latest component HTML + resolves template tokens in every page.
+  // Only writes pages whose content actually changed (skips unchanged files).
+  // Also refreshes the CodeMirror editor if a rebuilt page is currently open.
+  async rebuildAllPages() {
+    if (!State.project || !State.projectHandle) {
+      Utils.showToast('Open a project first.', 'error');
+      return;
+    }
+
+    const baseLang = State.project.baseLanguage;
+    const pages = State.pages;
+
+    if (!pages || pages.length === 0) {
+      Utils.showToast('No pages in project.', 'error');
+      return;
+    }
+
+    if (!confirm(
+      `Rebuild all ${pages.length} page(s) from source?\n\n` +
+      `This will re-inject the latest component HTML into every page file ` +
+      `in the project folder, overwriting the source HTML.\n\n` +
+      `Tip: Save any open editors before proceeding.`
+    )) return;
+
+    Utils.showToast('Rebuilding pages…', 'info', 2000);
+    const currentPageFile = PageEditor.getCurrentFilename();
+    let rebuilt = 0;
+    let unchanged = 0;
+    let failed = 0;
+
+    for (const page of pages) {
+      try {
+        const rawHtml = await ProjectManager.readPage(page.file);
+        if (!rawHtml) continue;
+
+        // Re-inject latest component markup and resolve template tokens.
+        // Do NOT call _processPageHtml — it skips _applyI18nOverlay for baseLang
+        // and returns the same string when components haven't changed.
+        // Here we want a direct inject + token-resolve without i18n overlay
+        // (base-lang source files ARE the i18n truth; use syncStringsToHtml for that).
+        let processed = Preview._injectComponents(rawHtml, page.file, baseLang);
+        processed = Preview._resolveTokens(processed, page.file, baseLang);
+
+        if (processed === rawHtml) {
+          unchanged++;
+          continue; // skip write — no actual change
+        }
+
+        await ProjectManager.savePage(page.file, processed);
+        rebuilt++;
+
+        // If this page is currently open in CodeMirror, refresh editor
+        if (page.file === currentPageFile && State.pageCodeMirror) {
+          const scrollInfo = State.pageCodeMirror.getScrollInfo();
+          State.pageCodeMirror.setValue(processed);
+          State.pageCodeMirror.clearHistory();
+          State.pageCodeMirror.scrollTo(scrollInfo.left, scrollInfo.top);
+          UI.setDirty(`page:${currentPageFile}`, false);
+          Preview.renderCurrentPage();
+        }
+      } catch (e) {
+        console.warn(`[Rebuild] Failed on ${page.file}:`, e);
+        failed++;
+      }
+    }
+
+    const parts = [];
+    if (rebuilt > 0) parts.push(`${rebuilt} page(s) updated`);
+    if (unchanged > 0) parts.push(`${unchanged} unchanged`);
+    if (failed > 0) parts.push(`${failed} failed`);
+    const msg = parts.length > 0
+      ? parts.join(', ') + '.'
+      : 'No pages processed.';
+    Utils.showToast(msg, rebuilt > 0 ? 'info' : 'warn', 4000);
+  },
+
   // ── Re-import components & shared data from index.html (existing project) ──────
   async reimportFromIndex() {
     if (!State.project) {
@@ -335,6 +412,16 @@ const App = {
     if (result) {
       UI.renderComponents();
       UI.renderSharedData();
+    }
+  },
+
+  // ── Update topbar button enabled/disabled states ───────────────────────────────
+  _updateTopbarButtons() {
+    const isOpen = !!State.project;
+    const ids = ['btn-save-all', 'btn-reimport', 'btn-rebuild', 'btn-export'];
+    for (const id of ids) {
+      const btn = document.getElementById(id);
+      if (btn) btn.disabled = !isOpen;
     }
   },
 

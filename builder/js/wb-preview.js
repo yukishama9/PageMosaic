@@ -165,7 +165,7 @@ const Preview = {
     // perform DOM-level text replacement using the i18n database.
     // Runs in both preview and export mode — Exporter also needs translated text
     // for non-base languages, for which no pre-translated source files exist.
-    processed = this._applyI18nOverlay(processed, lang);
+    processed = this._applyI18nOverlay(processed, lang, exportCtx);
 
     // Apply project theme based on cssMode
     const cssMode = State.project?.cssMode || 'tailwind-cdn';
@@ -393,25 +393,53 @@ const Preview = {
 
   // ── Apply i18n overlay: DOM-level text replacement for hardcoded HTML ─────────
   // For imported HTML sites that don't use {{t:...}} template tokens, this method
-  // walks the rendered HTML (as a DOM) and replaces all text nodes + key attributes
-  // that match the base-language strings with their target-language translations.
+  // walks the rendered HTML (as a DOM) and replaces text matching i18n values.
+  //
+  // Mode A only: lang ≠ baseLang — replace base-language strings with target translations.
+  // Base language is the source of truth (HTML files on disk); use "Sync Strings to HTML"
+  // button in the Language editor to write base-language edits back to the project files.
   //
   // Rules:
-  //   • Only runs when target lang ≠ base lang
-  //   • Only replaces entries where targetData[key] is non-empty
+  //   • Only replaces entries where the target value is non-empty
   //   • Replacements are sorted longest-first to avoid partial-match corruption
   //   • Only touches: text nodes, alt, title, placeholder, aria-label attributes
   //   • Skips script/style/pre/code element subtrees
-  _applyI18nOverlay(html, lang) {
+  // exportCtx (optional): truthy only during Exporter.run() — enables base-lang overlay
+  _applyI18nOverlay(html, lang, exportCtx) {
     if (!State.project || !lang) return html;
     const baseLang = State.project.baseLanguage;
-    if (!baseLang || lang === baseLang) return html; // nothing to do for base lang
+    if (!baseLang) return html;
 
-    const baseData = State.i18nData[baseLang] || {};
-    const targetData = State.i18nData[lang] || {};
-
-    // Build replacement list: [{ from, to }], skipping empty translations
     const replacements = [];
+
+    if (lang === baseLang) {
+      // ── Mode A: base language export ─────────────────────────────────────
+      // Preview mode: source HTML is the truth → skip overlay entirely.
+      if (!exportCtx) return html;
+
+      // Export mode: apply any edits made in the Language editor since the
+      // project was opened.  The snapshot holds what was in the HTML on disk;
+      // currentData holds what the user has since typed into the editor.
+      const snapshot    = State._i18nOriginalSnapshot || {};
+      const currentData = State.i18nData[baseLang]    || {};
+
+      // Iterate current data (not snapshot) so keys added by Text Scan after
+      // project load are also covered, not just keys present at load time.
+      // Use snapshot[key] as `from` when available (the original text in the HTML);
+      // fall back to current value as `from` for keys that weren't in the snapshot.
+      for (const [key, current] of Object.entries(currentData)) {
+        if (!current || typeof current !== 'string' || !current.trim()) continue;
+        const from = (snapshot[key] && typeof snapshot[key] === 'string')
+          ? snapshot[key]
+          : current;
+        replacements.push({ from, to: current });
+      }
+
+    } else {
+    // ── Mode B: non-base language translation overlay ─────────────────────
+    const baseData   = State.i18nData[baseLang] || {};
+    const targetData = State.i18nData[lang]      || {};
+
     for (const [key, baseText] of Object.entries(baseData)) {
       const t = targetData[key];
       if (!baseText || typeof baseText !== 'string') continue;
@@ -419,6 +447,7 @@ const Preview = {
       if (baseText === t) continue; // same text — skip
       replacements.push({ from: baseText, to: t });
     }
+    } // end mode B
 
     if (replacements.length === 0) return html;
 
@@ -1179,13 +1208,25 @@ const Exporter = {
   },
 
   // ── Recursively copy a directory ──────────────────────────────────────────────
+  // Electron mode: uses native fs:copyFile for correct binary handling.
+  // Browser (FSA) mode: reads as ArrayBuffer and writes via FileHandler.writeBinary.
   async _copyDirRecursive(srcDir, destDir) {
     const entries = await FileHandler.listEntries(srcDir);
     for (const entry of entries) {
       if (entry.kind === 'file') {
-        const file = await entry.handle.getFile();
-        const buf = await file.arrayBuffer();
-        await FileHandler.writeBinary(destDir, entry.name, buf);
+
+        // ── Electron: use native copyFile (avoids text-encoding corruption) ──
+        if (window.electronAPI && entry.fullPath && destDir._path) {
+          const destPath = destDir._path.replace(/\\/g, '/') + '/' + entry.name;
+          await window.electronAPI.copyFile(entry.fullPath, destPath);
+
+        } else {
+          // ── Browser FSA mode ──────────────────────────────────────────────
+          const file = await entry.handle.getFile();
+          const buf = await file.arrayBuffer();
+          await FileHandler.writeBinary(destDir, entry.name, buf);
+        }
+
       } else if (entry.kind === 'directory') {
         const subDest = await FileHandler.getDir(destDir, entry.name, true);
         await this._copyDirRecursive(entry.handle, subDest);

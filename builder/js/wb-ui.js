@@ -25,6 +25,8 @@ const UI = {
     document.getElementById('btn-export').disabled = false;
     const reimportBtn = document.getElementById('btn-reimport');
     if (reimportBtn) reimportBtn.disabled = false;
+    const rebuildBtn = document.getElementById('btn-rebuild');
+    if (rebuildBtn) rebuildBtn.disabled = false;
 
     this.renderPages();
     this.renderComponents();
@@ -379,6 +381,8 @@ const UI = {
     document.getElementById('btn-export').disabled = true;
     const reimportBtn2 = document.getElementById('btn-reimport');
     if (reimportBtn2) reimportBtn2.disabled = true;
+    const rebuildBtn2 = document.getElementById('btn-rebuild');
+    if (rebuildBtn2) rebuildBtn2.disabled = true;
     document.getElementById('tab-bar').innerHTML = '';
     this.showView('welcome');
     State.openTabs = [];

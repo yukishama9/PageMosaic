@@ -150,6 +150,18 @@ ipcMain.handle('fs:listDir', async (_event, dirPath) => {
   }
 });
 
+// Copy a binary file from srcPath to destPath (recursive mkdir on dest); returns true on success
+ipcMain.handle('fs:copyFile', async (_event, srcPath, destPath) => {
+  try {
+    await fsPromises.mkdir(path.dirname(destPath), { recursive: true });
+    await fsPromises.copyFile(srcPath, destPath);
+    return true;
+  } catch (err) {
+    console.error('fs:copyFile error', err);
+    return false;
+  }
+});
+
 // Open the given path in the OS file explorer (reveal in Finder / Explorer)
 ipcMain.handle('shell:showInFolder', async (_event, targetPath) => {
   shell.showItemInFolder(targetPath);

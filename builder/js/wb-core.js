@@ -35,6 +35,11 @@ const State = {
   previewDevice: 'desktop',
   previewLanguage: null,
 
+  // i18n base-language snapshot for real-time preview overlay
+  // Set when a project is loaded; each key maps to the text originally in the HTML.
+  // Used by _applyI18nOverlay() to detect user edits to base language strings.
+  _i18nOriginalSnapshot: {},
+
   // Dirty tracking
   dirtyFlags: {},            // { 'page:index.html': true }
 };

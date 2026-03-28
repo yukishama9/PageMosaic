@@ -22,6 +22,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   writeBinaryFile: (filePath, base64Content) =>
     ipcRenderer.invoke('fs:writeBinaryFile', filePath, base64Content),
 
+  // Copy a file from srcPath to destPath using native fs.copyFile; resolves to boolean
+  copyFile: (srcPath, destPath) =>
+    ipcRenderer.invoke('fs:copyFile', srcPath, destPath),
+
   // Delete a file; resolves to boolean
   deleteFile: (filePath) => ipcRenderer.invoke('fs:deleteFile', filePath),
 
