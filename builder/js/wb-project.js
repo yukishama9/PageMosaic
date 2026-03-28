@@ -104,6 +104,21 @@ function patchFileHandlerForElectron() {
     return api.deleteFile(p.replace(/\\/g, '/') + '/' + filename);
   };
 
+  const origWriteBinary = FileHandler.writeBinary.bind(FileHandler);
+  FileHandler.writeBinary = async function(handle, filename, arrayBuffer) {
+    const p = resolvePath(handle);
+    if (!p) return origWriteBinary(handle, filename, arrayBuffer);
+    // Convert ArrayBuffer → Base64 for IPC transfer
+    const bytes = new Uint8Array(arrayBuffer);
+    let binary = '';
+    const chunkSize = 8192;
+    for (let i = 0; i < bytes.byteLength; i += chunkSize) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+    }
+    const base64 = btoa(binary);
+    return api.writeBinaryFile(p.replace(/\\/g, '/') + '/' + filename, base64);
+  };
+
   // verifyPermission is a no-op for Electron handles (native FS is always accessible)
   const origVerifyPermission = FileHandler.verifyPermission.bind(FileHandler);
   FileHandler.verifyPermission = async function(handle, readWrite, silent) {
@@ -1151,10 +1166,7 @@ const ProjectManager = {
         const isBinary = /\.(png|jpg|jpeg|gif|webp|svg|ico|woff|woff2|ttf|eot|pdf|mp4|mp3|webm)$/i.test(entry.name);
         if (isBinary) {
           const buf = await file.arrayBuffer();
-          const fh = await destDir.getFileHandle(entry.name, { create: true });
-          const writable = await fh.createWritable();
-          await writable.write(buf);
-          await writable.close();
+          await FileHandler.writeBinary(destDir, entry.name, buf);
         } else {
           const text = await file.text();
           await FileHandler.writeFile(destDir, entry.name, text);

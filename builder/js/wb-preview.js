@@ -1185,10 +1185,7 @@ const Exporter = {
       if (entry.kind === 'file') {
         const file = await entry.handle.getFile();
         const buf = await file.arrayBuffer();
-        const fh = await destDir.getFileHandle(entry.name, { create: true });
-        const writable = await fh.createWritable();
-        await writable.write(buf);
-        await writable.close();
+        await FileHandler.writeBinary(destDir, entry.name, buf);
       } else if (entry.kind === 'directory') {
         const subDest = await FileHandler.getDir(destDir, entry.name, true);
         await this._copyDirRecursive(entry.handle, subDest);
