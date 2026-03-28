@@ -235,7 +235,7 @@ const AiChat = {
 
     // Warn if vision not supported but images attached
     if (attachedImages.length > 0 && !AiProvider.supportsVision()) {
-      Utils.showToast('当前模型不支持图片，图片将被忽略', 'warn');
+      Utils.showToast('Current model does not support images — images will be ignored', 'warn');
       attachedImages.length = 0;
     }
 
@@ -581,42 +581,42 @@ They are injected only at export — NOT in preview. Do not suggest adding analy
     if (State.activePage) {
       const f = State.activePage;
       return [
-        { label: '分析页面结构', prompt: `分析当前页面"${f}"的HTML结构，列出改进建议` },
-        { label: '优化 SEO 元标签', prompt: `帮我优化当前页面"${f}"的 SEO meta 标签（title, description, og 等）` },
-        { label: '添加响应式适配', prompt: `检查"${f}"的响应式布局，用 Tailwind CSS 补充移动端适配` },
-        { label: '检查可访问性', prompt: `检查"${f}"的 HTML 无障碍性（ARIA、alt、焦点顺序），给出修改建议` },
+        { label: 'Analyze page structure', prompt: `Analyze the HTML structure of page "${f}" and list improvement suggestions` },
+        { label: 'Optimize SEO meta tags', prompt: `Help optimize the SEO meta tags (title, description, og, etc.) of page "${f}"` },
+        { label: 'Add responsive layout', prompt: `Review the responsive layout of "${f}" and add Tailwind CSS mobile styles` },
+        { label: 'Check accessibility', prompt: `Check the accessibility of "${f}" (ARIA, alt, focus order) and suggest fixes` },
       ];
     }
     if (State.activeComponent) {
       const label = State.components?.[State.activeComponent]?.meta?.label || State.activeComponent;
       return [
-        { label: '重构组件结构', prompt: `帮我重构"${label}"组件，使其语义化更好、结构更清晰` },
-        { label: '添加动画过渡', prompt: `用 Tailwind CSS 为"${label}"组件添加合适的过渡动画` },
-        { label: '提取 i18n 文案', prompt: `分析"${label}"组件，建议哪些内容适合提取为 i18n key` },
-        { label: '改进移动端样式', prompt: `优化"${label}"组件的 Tailwind 移动端响应式样式` },
+        { label: 'Refactor component', prompt: `Help refactor the "${label}" component for better semantics and structure` },
+        { label: 'Add transitions', prompt: `Add appropriate Tailwind CSS transitions/animations to the "${label}" component` },
+        { label: 'Extract i18n keys', prompt: `Analyze the "${label}" component and suggest which content to extract as i18n keys` },
+        { label: 'Improve mobile styles', prompt: `Optimize the Tailwind CSS responsive styles of the "${label}" component` },
       ];
     }
     if (State.activeI18nLang) {
       const base = State.project?.baseLanguage || 'en';
       return [
-        { label: '翻译所有缺失文案', prompt: `请把当前 ${State.activeI18nLang} 语言中缺失的文案全部翻译好，参考 ${base} 语言` },
-        { label: '校对翻译质量', prompt: `校对当前 ${State.activeI18nLang} 语言的翻译，标出不自然或有误的条目` },
-        { label: '补充 SEO 文案', prompt: `为 ${State.activeI18nLang} 语言补充 SEO 相关的页面标题和描述文案` },
+        { label: 'Translate all missing', prompt: `Translate all missing strings for "${State.activeI18nLang}" using "${base}" as reference` },
+        { label: 'Proofread translations', prompt: `Proofread the "${State.activeI18nLang}" translations and flag unnatural or incorrect entries` },
+        { label: 'Add SEO copy', prompt: `Add SEO-focused page titles and descriptions for "${State.activeI18nLang}"` },
       ];
     }
     if (State.activeView === 'theme-editor') {
       return [
-        { label: '推荐专业配色方案', prompt: '为一个专业网站推荐一套配色方案，包含主色、强调色、背景色、文字色的十六进制值' },
-        { label: '深色模式配色建议', prompt: '如何调整当前主题配色以打造优雅的深色模式？' },
-        { label: '字体搭配建议', prompt: '为面向专业用户的网站推荐 Google Fonts 字体搭配方案（标题+正文）' },
+        { label: 'Suggest color scheme', prompt: 'Suggest a professional color scheme including primary, accent, background and text colors (hex values)' },
+        { label: 'Dark mode colors', prompt: 'How should I adjust the current theme colors to create an elegant dark mode?' },
+        { label: 'Font pairing advice', prompt: 'Recommend a Google Fonts pairing (headline + body) for a professional website' },
       ];
     }
     // Default — no editor open
     return [
-      { label: '生成 Hero 区域', prompt: '帮我写一段用 Tailwind CSS 的响应式 Hero 区域 HTML，包含标题、副标题、CTA 按钮' },
-      { label: '设计响应式导航栏', prompt: '生成一个支持移动端折叠的 Tailwind CSS 导航栏 HTML 组件' },
-      { label: '优化 SEO 模板', prompt: '帮我写一套完整的 SEO meta 标签模板，包含 OG 和 Twitter Cards' },
-      { label: '批量翻译 i18n', prompt: '帮我翻译缺失的 i18n 文案，我会把 key 列表发给你' },
+      { label: 'Generate a Hero section', prompt: 'Write a responsive Tailwind CSS Hero section HTML with a headline, subtitle, and CTA button' },
+      { label: 'Design responsive navbar', prompt: 'Generate a mobile-collapsible Tailwind CSS navbar component' },
+      { label: 'SEO meta template', prompt: 'Write a complete SEO meta tag template including OG and Twitter Cards' },
+      { label: 'Batch translate i18n', prompt: 'Help me translate missing i18n strings — I will paste the key list' },
     ];
   },
 
@@ -1247,7 +1247,7 @@ They are injected only at export — NOT in preview. Do not suggest adding analy
         const file = State.activePage || '(no page open)';
         if (!html) return null;
         const snippet = html.length > 6000 ? html.slice(0, 6000) + '\n<!-- [truncated] -->' : html;
-        return `${msg.replace(/^\/page\s*/, '') || '请分析以下页面'}\n\n[当前页面 ${file} 完整 HTML]\n\`\`\`html\n${snippet}\n\`\`\``;
+        return `${msg.replace(/^\/page\s*/, '') || 'Analyze the following page'}\n\n[Full HTML of page ${file}]\n\`\`\`html\n${snippet}\n\`\`\``;
       },
       '/comp':  () => {
         const html = State.compCodeMirror?.getValue()
@@ -1255,7 +1255,7 @@ They are injected only at export — NOT in preview. Do not suggest adding analy
         const id = State.activeComponent || '(no component open)';
         if (!html) return null;
         const snippet = html.length > 4000 ? html.slice(0, 4000) + '\n<!-- [truncated] -->' : html;
-        return `${msg.replace(/^\/comp\s*/, '') || '请分析以下组件'}\n\n[组件 ${id} 完整 HTML]\n\`\`\`html\n${snippet}\n\`\`\``;
+        return `${msg.replace(/^\/comp\s*/, '') || 'Analyze the following component'}\n\n[Full HTML of component ${id}]\n\`\`\`html\n${snippet}\n\`\`\``;
       },
       '/i18n':  () => {
         const base = State.project?.baseLanguage || 'en';
@@ -1263,12 +1263,12 @@ They are injected only at export — NOT in preview. Do not suggest adding analy
         const entries = Object.entries(baseData).slice(0, 80);
         if (!entries.length) return null;
         const table = entries.map(([k, v]) => `  "${k}": "${v}"`).join(',\n');
-        return `${msg.replace(/^\/i18n\s*/, '') || '请处理以下 i18n 数据'}\n\n[${base} 语言 i18n (前80条)]\n\`\`\`json\n{\n${table}\n}\n\`\`\``;
+        return `${msg.replace(/^\/i18n\s*/, '') || 'Process the following i18n data'}\n\n[${base} i18n (first 80 entries)]\n\`\`\`json\n{\n${table}\n}\n\`\`\``;
       },
       '/theme': () => {
         const theme = State.project?.theme;
         if (!theme) return null;
-        return `${msg.replace(/^\/theme\s*/, '') || '请分析主题配置'}\n\n[主题配置]\n\`\`\`json\n${JSON.stringify(theme, null, 2)}\n\`\`\``;
+        return `${msg.replace(/^\/theme\s*/, '') || 'Analyze the theme configuration'}\n\n[Theme config]\n\`\`\`json\n${JSON.stringify(theme, null, 2)}\n\`\`\``;
       },
     };
 
@@ -1403,7 +1403,7 @@ They are injected only at export — NOT in preview. Do not suggest adding analy
   // ── P5 — Read a File/Blob as base64 dataURL and stage it ─────────────────────
   async _addImageFromFile(file) {
     if (this._pendingImages.length >= 4) {
-      Utils.showToast('最多附加 4 张图片', 'warn'); return;
+      Utils.showToast('Max 4 images allowed', 'warn'); return;
     }
     try {
       const dataUrl = await new Promise((resolve, reject) => {
@@ -1419,7 +1419,7 @@ They are injected only at export — NOT in preview. Do not suggest adding analy
       });
       this._renderImagePreviews();
     } catch (err) {
-      Utils.showToast('图片读取失败：' + err.message, 'error');
+      Utils.showToast('Failed to read image: ' + err.message, 'error');
     }
   },
 
@@ -1463,7 +1463,7 @@ They are injected only at export — NOT in preview. Do not suggest adding analy
     this._dismissQuickMenu();
     const actions = this._getQuickActions();
     if (!actions.length) {
-      Utils.showToast('请先打开页面或组件编辑器', 'warn'); return;
+      Utils.showToast('Open a page or component editor first', 'warn'); return;
     }
     this._quickActions = actions;
 
@@ -1925,45 +1925,45 @@ They are injected only at export — NOT in preview. Do not suggest adding analy
       const f = State.activePage;
       const sel = State.pageCodeMirror?.getSelection()?.trim();
       if (sel) {
-        acts.push({ icon: 'select_all', label: '分析选中代码',
-          prompt: '分析并改进以下 HTML 代码：\n```html\n' + sel + '\n```' });
+        acts.push({ icon: 'select_all', label: 'Analyze selected code',
+          prompt: 'Analyze and improve the following HTML code:\n```html\n' + sel + '\n```' });
         acts.push({ divider: true });
       }
-      acts.push({ icon: 'account_tree', label: '分析页面结构',
-        prompt: '/page 分析"' + f + '"的 HTML 结构，找出问题并给出具体改进建议' });
-      acts.push({ icon: 'smartphone', label: '检查移动端适配',
-        prompt: '/page 检查"' + f + '"的响应式设计，用 Tailwind 补充移动端样式' });
-      acts.push({ icon: 'travel_explore', label: '优化 SEO 标签',
-        prompt: '/page 审查"' + f + '"的 SEO meta 标签（title, description, og, canonical），给出优化方案' });
-      acts.push({ icon: 'accessibility_new', label: '检查可访问性',
-        prompt: '/page 检查"' + f + '"的 ARIA roles, alt text, tabindex, 颜色对比，给出修改方案' });
-      acts.push({ icon: 'add_circle', label: '生成新内容区块',
-        prompt: '为页面"' + f + '"生成一段新的 Tailwind CSS HTML 区块，请描述你需要什么' });
+      acts.push({ icon: 'account_tree', label: 'Analyze page structure',
+        prompt: '/page Analyze the HTML structure of "' + f + '" and suggest specific improvements' });
+      acts.push({ icon: 'smartphone', label: 'Check mobile layout',
+        prompt: '/page Review the responsive design of "' + f + '" and add missing Tailwind mobile styles' });
+      acts.push({ icon: 'travel_explore', label: 'Optimize SEO tags',
+        prompt: '/page Audit the SEO meta tags (title, description, og, canonical) of "' + f + '" and suggest improvements' });
+      acts.push({ icon: 'accessibility_new', label: 'Check accessibility',
+        prompt: '/page Check ARIA roles, alt text, tabindex, and color contrast in "' + f + '" and suggest fixes' });
+      acts.push({ icon: 'add_circle', label: 'Generate new section',
+        prompt: 'Generate a new Tailwind CSS HTML section for page "' + f + '" — describe what you need' });
 
     } else if (State.activeComponent) {
       const id    = State.activeComponent;
       const label = State.components?.[id]?.meta?.label || id;
       const sel   = State.compCodeMirror?.getSelection()?.trim();
       if (sel) {
-        acts.push({ icon: 'select_all', label: '分析选中代码',
-          prompt: '分析并改进以下组件代码：\n```html\n' + sel + '\n```' });
+        acts.push({ icon: 'select_all', label: 'Analyze selected code',
+          prompt: 'Analyze and improve the following component code:\n```html\n' + sel + '\n```' });
         acts.push({ divider: true });
       }
-      acts.push({ icon: 'architecture', label: '重构组件结构',
-        prompt: '/comp 重构"' + label + '"组件，改善语义化、可读性和 Tailwind class 编排' });
-      acts.push({ icon: 'animation', label: '添加过渡动画',
-        prompt: '/comp 为"' + label + '"组件用 Tailwind CSS 添加合适的过渡/动画效果' });
-      acts.push({ icon: 'translate', label: '提取 i18n 文案',
-        prompt: '/comp 找出"' + label + '"组件中所有硬编码的文字，给出 i18n key 提取方案' });
-      acts.push({ icon: 'smartphone', label: '改进移动端样式',
-        prompt: '/comp 优化"' + label + '"组件的 Tailwind 响应式样式（sm → 2xl）' });
+      acts.push({ icon: 'architecture', label: 'Refactor component',
+        prompt: '/comp Refactor the "' + label + '" component for better semantics, readability, and Tailwind class organization' });
+      acts.push({ icon: 'animation', label: 'Add animations',
+        prompt: '/comp Add appropriate Tailwind CSS transitions/animations to the "' + label + '" component' });
+      acts.push({ icon: 'translate', label: 'Extract i18n keys',
+        prompt: '/comp Find all hardcoded text in the "' + label + '" component and suggest i18n key extraction' });
+      acts.push({ icon: 'smartphone', label: 'Improve mobile styles',
+        prompt: '/comp Optimize the Tailwind responsive styles (sm → 2xl) for the "' + label + '" component' });
 
     } else if (State.activeI18nLang) {
       const base = State.project?.baseLanguage || 'en';
-      acts.push({ icon: 'translate', label: '翻译所有缺失文案',
-        prompt: '/i18n 将所有缺失的 ' + State.activeI18nLang + ' 翻译补全，参考 ' + base + ' 语言，输出 JSON' });
-      acts.push({ icon: 'spellcheck', label: '校对翻译质量',
-        prompt: '/i18n 校对现有 ' + State.activeI18nLang + ' 翻译，标出不自然或有误的条目并给出修正版本' });
+      acts.push({ icon: 'translate', label: 'Translate all missing',
+        prompt: '/i18n Translate all missing "' + State.activeI18nLang + '" strings using "' + base + '" as reference, output JSON' });
+      acts.push({ icon: 'spellcheck', label: 'Proofread translations',
+        prompt: '/i18n Proofread the existing "' + State.activeI18nLang + '" translations, flag unnatural or incorrect entries and provide corrections' });
     }
 
     return acts;
