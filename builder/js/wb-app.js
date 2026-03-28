@@ -38,6 +38,9 @@ const App = {
 
     // Populate recent projects list on welcome screen
     await this._renderWelcomeProjects();
+
+    // Show CTA popup on first launch and every 30 days
+    this._checkCtaPopup();
   },
 
   // Refresh all workspace-status UI elements (welcome page + sidebar)
@@ -81,6 +84,26 @@ const App = {
 
     // App Settings modal (live-update if open)
     if (typeof UI !== 'undefined') UI.populateAppSettings();
+  },
+
+  // ── CTA popup: first launch + monthly ─────────────────────────────────────────
+  _checkCtaPopup() {
+    const key = 'pm-cta-last-shown';
+    const last = parseInt(localStorage.getItem(key) || '0', 10);
+    const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+    if (!last || Date.now() - last > MONTH_MS) {
+      localStorage.setItem(key, String(Date.now()));
+      setTimeout(() => UI.openModal('modal-welcome-cta'), 900);
+    }
+  },
+
+  // ── Open external URL (works in both browser and Electron) ────────────────────
+  _openExternal(url) {
+    if (window.electronAPI?.openExternal) {
+      window.electronAPI.openExternal(url);
+    } else {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
   },
 
   // ── Welcome screen: render recent projects list ────────────────────────────────

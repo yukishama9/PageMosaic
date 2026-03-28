@@ -238,6 +238,24 @@
           <p style="font-size:12px;color:#444;text-align:center;padding:12px 0">Loading…</p>
         </div>
 
+        <!-- CTA: GitHub Star + Support + Homepage -->
+        <div style="margin-top:24px;border-top:1px solid #111118;padding-top:16px;display:flex;flex-direction:column;gap:8px;align-items:center">
+          <button onclick="App._openExternal('https://github.com/yukishama9/PageMosaic')"
+                  style="width:100%;max-width:240px;display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 14px;background:#1a1a2e;border:1px solid #2a2a44;border-radius:6px;color:#e0e0e0;font-size:12px;cursor:pointer;transition:background .15s"
+                  onmouseover="this.style.background='#222240'" onmouseout="this.style.background='#1a1a2e'">
+            ⭐ Star on GitHub
+          </button>
+          <button onclick="App._openExternal('https://yukishama9.github.io/Helios-Blog/')"
+                  style="width:100%;max-width:240px;display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 14px;background:#1a1a2e;border:1px solid #2a2a44;border-radius:6px;color:#e0e0e0;font-size:12px;cursor:pointer;transition:background .15s"
+                  onmouseover="this.style.background='#222240'" onmouseout="this.style.background='#1a1a2e'">
+            ☕ Buy Me a Coffee
+          </button>
+          <a href="#" onclick="App._openExternal('https://yukishama9.github.io/PageMosaic/');return false"
+             style="font-size:11px;color:#6366f1;text-decoration:none;margin-top:2px">
+            Project Homepage ↗
+          </a>
+        </div>
+
       </div>
     </div>
 
@@ -1299,6 +1317,47 @@
         <span class="material-symbols-outlined" style="font-size:15px">check</span>
         Apply to Theme
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Welcome CTA -->
+<div id="modal-welcome-cta" class="modal-backdrop hidden">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <span class="modal-title" style="display:flex;align-items:center;gap:8px">
+        <img src="img/logo.svg" style="height:18px;width:18px;flex-shrink:0">
+        Support PageMosaic
+      </span>
+      <button class="modal-close" onclick="UI.closeModal('modal-welcome-cta')">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="modal-body" style="text-align:center;padding:24px 28px 16px">
+      <p style="font-size:15px;font-weight:600;color:#e0e0e0;margin:0 0 10px">Enjoying PageMosaic?</p>
+      <p style="font-size:12px;color:#666;line-height:1.7;margin:0 0 24px">
+        PageMosaic is free &amp; open-source. If it saves you time,<br>
+        a GitHub star or a coffee goes a long way — thank you! ☕
+      </p>
+      <div style="display:flex;flex-direction:column;gap:10px;max-width:220px;margin:0 auto">
+        <button onclick="App._openExternal('https://github.com/yukishama9/PageMosaic')"
+                style="display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 16px;background:#6366f1;border:none;border-radius:6px;color:#fff;font-size:13px;font-weight:600;cursor:pointer;transition:opacity .15s"
+                onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+          ⭐ Star on GitHub
+        </button>
+        <button onclick="App._openExternal('https://yukishama9.github.io/Helios-Blog/')"
+                style="display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 16px;background:#1a1a2e;border:1px solid #2a2a44;border-radius:6px;color:#e0e0e0;font-size:13px;cursor:pointer;transition:background .15s"
+                onmouseover="this.style.background='#222240'" onmouseout="this.style.background='#1a1a2e'">
+          ☕ Buy Me a Coffee
+        </button>
+        <a href="#" onclick="App._openExternal('https://yukishama9.github.io/PageMosaic/');return false"
+           style="font-size:11px;color:#6366f1;text-decoration:none;margin-top:4px;display:block">
+          Visit Project Homepage ↗
+        </a>
+      </div>
+    </div>
+    <div class="modal-footer" style="justify-content:center">
+      <button class="btn-secondary" onclick="UI.closeModal('modal-welcome-cta')">Maybe Later</button>
     </div>
   </div>
 </div>
