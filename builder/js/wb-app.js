@@ -307,13 +307,12 @@ const App = {
         const rawHtml = await ProjectManager.readPage(page.file);
         if (!rawHtml) continue;
 
-        // Re-inject latest component markup and resolve template tokens.
-        // Do NOT call _processPageHtml — it skips _applyI18nOverlay for baseLang
-        // and returns the same string when components haven't changed.
-        // Here we want a direct inject + token-resolve without i18n overlay
-        // (base-lang source files ARE the i18n truth; use syncStringsToHtml for that).
+        // Re-inject latest component markup and resolve template tokens,
+        // then apply the base-language i18n overlay so any strings edited
+        // in the Language Editor are written back into the source HTML.
         let processed = Preview._injectComponents(rawHtml, page.file, baseLang);
         processed = Preview._resolveTokens(processed, page.file, baseLang);
+        processed = Preview._applyI18nOverlay(processed, page.file, baseLang);
 
         if (processed === rawHtml) {
           unchanged++;
@@ -336,6 +335,12 @@ const App = {
         console.warn(`[Rebuild] Failed on ${page.file}:`, e);
         failed++;
       }
+    }
+
+    // Rebuild i18n snapshot from newly written HTML so the next rebuild/export
+    // correctly detects changes relative to what is now on disk.
+    if (rebuilt > 0) {
+      try { await ProjectManager._buildI18nSnapshot(State.project); } catch (_) {}
     }
 
     const parts = [];
